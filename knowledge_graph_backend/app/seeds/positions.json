@@ -1,0 +1,30 @@
+{
+  "version": "2026-08-15.1",
+  "position_categories": [
+    {"id": "category_backend_engineering", "name": "后端研发", "parent_id": null, "description": "服务端与分布式系统研发"},
+    {"id": "category_frontend_engineering", "name": "前端研发", "parent_id": null, "description": "Web 前端与跨端研发"},
+    {"id": "category_ai_engineering", "name": "人工智能研发", "parent_id": null, "description": "算法、大模型与智能应用研发"},
+    {"id": "category_data_engineering", "name": "数据研发", "parent_id": null, "description": "数据平台、数据仓库与分析"},
+    {"id": "category_cloud_operations", "name": "云计算与运维", "parent_id": null, "description": "云平台、运维与平台工程"},
+    {"id": "category_security", "name": "网络与信息安全", "parent_id": null, "description": "安全研发、治理与运营"},
+    {"id": "category_iot_embedded", "name": "物联网与嵌入式研发", "parent_id": null, "description": "嵌入式、物联网和硬件研发"},
+    {"id": "category_test_quality", "name": "测试与质量保障", "parent_id": null, "description": "软件测试和质量工程"}
+  ],
+  "positions": [
+    {"id": "pos_java_backend", "name": "Java 后端开发工程师", "aliases": ["Java开发工程师", "Java研发工程师", "Java后端工程师"], "category_id": "category_backend_engineering", "description": "使用 Java 技术栈开发服务端系统"},
+    {"id": "pos_go_backend", "name": "Go 后端开发工程师", "aliases": ["Go开发工程师", "Golang开发工程师", "Go后端工程师"], "category_id": "category_backend_engineering", "description": "使用 Go 开发高并发服务端系统"},
+    {"id": "pos_python_backend", "name": "Python 后端开发工程师", "aliases": ["Python开发工程师", "Python服务端工程师"], "category_id": "category_backend_engineering", "description": "使用 Python 开发服务端应用"},
+    {"id": "pos_frontend_engineer", "name": "前端开发工程师", "aliases": ["Web前端开发", "前端工程师", "Web前端工程师"], "category_id": "category_frontend_engineering", "description": "负责 Web 前端产品与工程化研发"},
+    {"id": "pos_machine_learning_engineer", "name": "机器学习工程师", "aliases": ["机器学习算法工程师", "AI算法工程师", "算法工程师"], "category_id": "category_ai_engineering", "description": "负责机器学习模型研发与落地"},
+    {"id": "pos_llm_algorithm_engineer", "name": "大模型算法工程师", "aliases": ["LLM算法工程师", "大语言模型算法工程师", "大模型工程师"], "category_id": "category_ai_engineering", "description": "负责大模型训练、优化和评测"},
+    {"id": "pos_ai_agent_engineer", "name": "AI Agent 研发工程师", "aliases": ["智能体研发工程师", "Agent开发工程师", "Agent研发工程师", "AI智能体工程师"], "category_id": "category_ai_engineering", "description": "负责智能体、工具调用和工作流系统研发", "status": "emerging"},
+    {"id": "pos_nlp_engineer", "name": "自然语言处理工程师", "aliases": ["NLP算法工程师", "NLP工程师"], "category_id": "category_ai_engineering", "description": "负责自然语言处理算法和应用"},
+    {"id": "pos_cv_engineer", "name": "计算机视觉工程师", "aliases": ["CV算法工程师", "视觉算法工程师", "图像算法工程师"], "category_id": "category_ai_engineering", "description": "负责视觉算法研发和部署"},
+    {"id": "pos_data_engineer", "name": "数据工程师", "aliases": ["大数据开发工程师", "数据开发工程师", "数据平台研发工程师"], "category_id": "category_data_engineering", "description": "负责数据处理平台和数据链路建设"},
+    {"id": "pos_devops_engineer", "name": "DevOps 工程师", "aliases": ["运维开发工程师", "平台工程师", "SRE工程师", "站点可靠性工程师"], "category_id": "category_cloud_operations", "description": "负责交付、平台和可靠性工程"},
+    {"id": "pos_cloud_engineer", "name": "云计算工程师", "aliases": ["云平台开发工程师", "云原生工程师"], "category_id": "category_cloud_operations", "description": "负责云平台与云原生系统建设"},
+    {"id": "pos_security_engineer", "name": "安全工程师", "aliases": ["网络安全工程师", "安全研发工程师", "应用安全工程师"], "category_id": "category_security", "description": "负责安全技术、平台和治理"},
+    {"id": "pos_embedded_engineer", "name": "嵌入式软件工程师", "aliases": ["嵌入式开发工程师", "嵌入式工程师", "物联网开发工程师"], "category_id": "category_iot_embedded", "description": "负责嵌入式系统和物联网软件研发"},
+    {"id": "pos_test_engineer", "name": "测试开发工程师", "aliases": ["测试工程师", "自动化测试工程师", "质量工程师"], "category_id": "category_test_quality", "description": "负责自动化测试和质量平台建设"}
+  ]
+}
