@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -28,8 +28,9 @@ from .models import (
     utcnow,
 )
 from .pipeline import PipelineService
+from .resume_service import MAX_UPLOAD_BYTES, get_resume_task_store
 from .runtime import get_graph_repository
-from .schemas import EntityCreate, GoldAnnotationCreate, PipelineRunCreate, ReviewDecision
+from .schemas import EntityCreate, GoldAnnotationCreate, PipelineRunCreate, ResumeSkillPatch, ReviewDecision
 
 
 router = APIRouter(prefix="/api/v1")
@@ -360,6 +361,41 @@ def emerging_positions(
             "pageSize": pageSize,
         },
     )
+
+
+@router.post("/resume-tasks", status_code=202)
+async def create_resume_task(request: Request, file: UploadFile = File(...)):
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="uploaded file is empty")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="resume file exceeds 10 MB limit")
+    store = get_resume_task_store()
+    try:
+        task = store.create(file.filename or "resume", data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _response(request, task.as_dict())
+
+
+@router.get("/resume-tasks/{task_id}")
+def get_resume_task(request: Request, task_id: str):
+    task = get_resume_task_store().get(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="resume task not found")
+    return _response(request, task.as_dict())
+
+
+@router.patch("/resume-tasks/{task_id}/skills")
+def patch_resume_task_skills(request: Request, task_id: str, payload: ResumeSkillPatch):
+    added = [item.model_dump() for item in payload.added]
+    updated = [item.model_dump(exclude_none=True) for item in payload.updated]
+    task = get_resume_task_store().apply_skill_edits(task_id, added, payload.removed, updated)
+    if task is None:
+        raise HTTPException(status_code=404, detail="resume task not found")
+    if task.profile is None:
+        raise HTTPException(status_code=409, detail="resume task has no parsed result yet")
+    return _response(request, task.as_dict())
 
 
 @router.post("/pipeline-runs", status_code=202, dependencies=[Depends(require_admin)])

@@ -37,6 +37,28 @@ class EntityCreate(BaseModel):
     aliases: list[str] = Field(default_factory=list)
 
 
+class ResumeSkillAdd(BaseModel):
+    id: str | None = None
+    name: str = Field(min_length=1, max_length=120)
+    level: Literal["熟悉", "掌握", "精通"] = "掌握"
+    source: str = ""
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
+class ResumeSkillUpdate(BaseModel):
+    id: str | None = None
+    name: str | None = Field(default=None, max_length=120)
+    level: Literal["熟悉", "掌握", "精通"] | None = None
+    source: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class ResumeSkillPatch(BaseModel):
+    added: list[ResumeSkillAdd] = Field(default_factory=list)
+    removed: list[str] = Field(default_factory=list)
+    updated: list[ResumeSkillUpdate] = Field(default_factory=list)
+
+
 class RunView(BaseModel):
     id: str
     status: str
