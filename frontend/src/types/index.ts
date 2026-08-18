@@ -99,11 +99,52 @@ export interface ChangeRecord {
   confidence: number
 }
 
+export type ResumeSkillLevel = '熟悉' | '掌握' | '精通'
+
 export interface ResumeSkill {
+  id?: string
   name: string
-  level: '熟悉' | '掌握' | '精通'
+  level: ResumeSkillLevel
   source: string
   confidence: number
+}
+
+export interface ResumeExperience {
+  period: string
+  title: string
+  detail: string
+  tags: string[]
+}
+
+export interface ResumeProfile {
+  name: string
+  intendedPosition: string
+  education: string
+  experienceYears: number | null
+  summary: string
+  completeness: number
+  skills: ResumeSkill[]
+  experiences: ResumeExperience[]
+}
+
+export type ResumeTaskStatus = 'queued' | 'processing' | 'succeeded' | 'failed'
+
+export interface ResumeTask {
+  id: string
+  filename: string
+  fileSize: number
+  status: ResumeTaskStatus
+  progress: number
+  createdAt: string
+  updatedAt: string
+  error: string | null
+  result?: ResumeProfile
+}
+
+export interface ResumeSkillPatch {
+  added?: ResumeSkill[]
+  removed?: string[]
+  updated?: ResumeSkill[]
 }
 
 export interface MatchDimension {
