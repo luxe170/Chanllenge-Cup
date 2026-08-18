@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.ocr import CallableOcrProvider, HttpOcrProvider, NullOcrProvider, OcrError, _extract_text_from_response, set_ocr_provider
 from app.resume import parse_resume_text
 from app.resume_service import get_resume_task_store
 from app.resume_text import ResumeTextError, extract_resume_text
@@ -123,6 +124,64 @@ def test_resume_task_rejects_bad_pdf():
         body = response.json()["data"]
         assert body["status"] == "failed"
         assert body["error"]
+
+
+def _build_scanned_pdf() -> bytes:
+    """Render a PNG into a single-page PDF that has no text layer."""
+
+    import fitz  # PyMuPDF
+
+    document = fitz.open()
+    page = document.new_page(width=595, height=842)
+    # A blank rectangle is enough — the point is there's no text layer.
+    page.draw_rect(fitz.Rect(50, 50, 545, 792), color=(0.9, 0.9, 0.9), fill=(1, 1, 1))
+    data = document.tobytes()
+    document.close()
+    return data
+
+
+def test_scanned_pdf_routes_through_ocr_provider():
+    calls: list[tuple[int, str]] = []
+
+    def fake_ocr(image: bytes, mime: str) -> str:
+        calls.append((len(image), mime))
+        return "陈小雨\n精通 Python 与 RAG 检索链路"
+
+    set_ocr_provider(CallableOcrProvider(fake_ocr, name="fake"))
+    try:
+        text = extract_resume_text("scanned.pdf", _build_scanned_pdf())
+    finally:
+        set_ocr_provider(None)
+    assert "陈小雨" in text
+    assert calls and calls[0][1] == "image/png"
+
+
+def test_scanned_pdf_without_provider_reports_clear_error():
+    set_ocr_provider(NullOcrProvider())
+    try:
+        with pytest.raises(ResumeTextError, match="OCR"):
+            extract_resume_text("scanned.pdf", _build_scanned_pdf())
+    finally:
+        set_ocr_provider(None)
+
+
+def test_null_ocr_provider_raises_on_recognize():
+    provider = NullOcrProvider()
+    assert provider.available is False
+    with pytest.raises(OcrError):
+        provider.recognize(b"x")
+
+
+def test_http_ocr_provider_requires_endpoint():
+    with pytest.raises(ValueError):
+        HttpOcrProvider(endpoint="")
+
+
+def test_ocr_response_extractor_handles_nested_shapes():
+    assert _extract_text_from_response({"text": "hi"}) == "hi"
+    assert _extract_text_from_response({"data": {"text": "hi"}}) == "hi"
+    assert _extract_text_from_response({"result": [{"text": "a"}, {"text": "b"}]}) == "a\nb"
+    assert _extract_text_from_response({"nope": 1}) == ""
 
 
 def test_resume_store_singleton():
