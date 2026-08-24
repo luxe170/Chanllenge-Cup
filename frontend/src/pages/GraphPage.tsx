@@ -1,11 +1,10 @@
 import { ChevronDown, ExternalLink, Focus, Layers3, Maximize2, Minus, Plus, Search, Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Confidence, SectionHeader } from '../components/common'
 import Graph3D from '../components/graph/Graph3D'
 import { panoramaEdges, panoramaNodes, skillReverseEdges, skillReverseNodes } from '../data/mock'
-import type { GraphEdge, GraphNode } from '../types'
-
-type GraphMode = 'panorama' | 'skill'
+import { api } from '../services/api'
+import type { GraphData, GraphEdge, GraphMode, GraphNode, GraphNodeDetail, GraphRoot, GraphSearchItem } from '../types'
 
 const nodeColors = { position: '#7c6df2', skill: '#45c9dc', cluster: '#58d09e', stack: '#f5b86b' }
 
@@ -16,7 +15,7 @@ const modeConfig: Record<GraphMode, { label: string; title: string; subtitle: st
     subtitle: '岗位簇 → 岗位 → 技能点',
     description: '从岗位簇出发，逐层查看标准岗位及其直接要求的技能点。',
   },
-  skill: {
+  skill_reverse: {
     label: '技能反查',
     title: '技能需求反查图谱',
     subtitle: '技术栈 → 技能簇 → 技能点 → 岗位',
@@ -24,14 +23,25 @@ const modeConfig: Record<GraphMode, { label: string; title: string; subtitle: st
   },
 }
 
-const graphData: Record<GraphMode, { nodes: GraphNode[]; edges: GraphEdge[] }> = {
-  panorama: { nodes: panoramaNodes, edges: panoramaEdges },
-  skill: { nodes: skillReverseNodes, edges: skillReverseEdges },
-}
+const createFallbackGraph = (mode: GraphMode, nodes: GraphNode[], edges: GraphEdge[]): GraphData => ({
+  mode,
+  hierarchy: mode === 'panorama' ? ['cluster', 'position', 'skill'] : ['stack', 'cluster', 'skill', 'position'],
+  nodes,
+  edges,
+  summary: {
+    positionClusterCount: nodes.filter((node) => mode === 'panorama' && node.type === 'cluster').length,
+    techStackCount: nodes.filter((node) => node.type === 'stack').length,
+    skillClusterCount: nodes.filter((node) => mode === 'skill_reverse' && node.type === 'cluster').length,
+    positionCount: nodes.filter((node) => node.type === 'position').length,
+    skillCount: nodes.filter((node) => node.type === 'skill').length,
+  },
+  updatedAt: '2026-07-29T10:00:00+08:00',
+  graphVersion: 'mock.1',
+})
 
-const modeSummary: Record<GraphMode, [string, string, string]> = {
-  panorama: ['3 个岗位簇', '6 个岗位', '9 个技能点'],
-  skill: ['1 个技术栈', '4 个技能点', '5 个关联岗位'],
+const fallbackGraphs: Record<GraphMode, GraphData> = {
+  panorama: createFallbackGraph('panorama', panoramaNodes, panoramaEdges),
+  skill_reverse: createFallbackGraph('skill_reverse', skillReverseNodes, skillReverseEdges),
 }
 
 const layerGuides: Record<GraphMode, Array<{ label: string; top: string }>> = {
@@ -40,7 +50,7 @@ const layerGuides: Record<GraphMode, Array<{ label: string; top: string }>> = {
     { label: '岗位', top: '43%' },
     { label: '技能点', top: '82%' },
   ],
-  skill: [
+  skill_reverse: [
     { label: '技术栈', top: '3%' },
     { label: '技能簇', top: '26%' },
     { label: '技能点', top: '52%' },
@@ -52,17 +62,64 @@ const cleanName = (name: string) => name.replaceAll('\n', ' ')
 
 export default function GraphPage() {
   const [mode, setMode] = useState<GraphMode>('panorama')
-  const [selectedNode, setSelectedNode] = useState<GraphNode>(panoramaNodes[0])
+  const [activeGraph, setActiveGraph] = useState<GraphData>(fallbackGraphs.panorama)
+  const [selectedNode, setSelectedNode] = useState<GraphNode>(fallbackGraphs.panorama.nodes[0])
+  const [selectedDetail, setSelectedDetail] = useState<GraphNodeDetail | null>(null)
+  const [roots, setRoots] = useState<GraphRoot[]>([])
+  const [keyword, setKeyword] = useState('')
+  const [searchItems, setSearchItems] = useState<GraphSearchItem[]>([])
   const [scale, setScale] = useState(1)
   const [resetSignal, setResetSignal] = useState(0)
-  const activeGraph = graphData[mode]
   const activeConfig = modeConfig[mode]
+
+  useEffect(() => {
+    let active = true
+    api.getGraph(mode)
+      .then((res) => {
+        const nextGraph = res.data.nodes.length > 0 ? res.data : fallbackGraphs[mode]
+        if (!active) return
+        setActiveGraph(nextGraph)
+        setSelectedNode(nextGraph.nodes[0])
+      })
+      .catch(() => {
+        if (!active) return
+        setActiveGraph(fallbackGraphs[mode])
+        setSelectedNode(fallbackGraphs[mode].nodes[0])
+      })
+    return () => { active = false }
+  }, [mode])
+
+  useEffect(() => {
+    api.getGraphRoots(mode).then((res) => setRoots(res.data)).catch(() => setRoots([]))
+  }, [mode])
+
+  useEffect(() => {
+    setSelectedDetail(null)
+    api.getGraphNodeDetail(selectedNode.id).then((res) => setSelectedDetail(res.data)).catch(() => setSelectedDetail(null))
+  }, [selectedNode.id])
+
+  useEffect(() => {
+    if (keyword.trim().length < 2) {
+      setSearchItems([])
+      return
+    }
+    const timer = window.setTimeout(() => {
+      api.searchGraph(mode, keyword.trim(), 6).then((res) => setSearchItems(res.data)).catch(() => setSearchItems([]))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [keyword, mode])
 
   const changeMode = (nextMode: GraphMode) => {
     setMode(nextMode)
-    setSelectedNode(graphData[nextMode].nodes[0])
+    setKeyword('')
+    setSearchItems([])
     setScale(1)
     setResetSignal((value) => value + 1)
+  }
+
+  const focusNode = (nodeId: string) => {
+    const target = activeGraph.nodes.find((node) => node.id === nodeId)
+    if (target) setSelectedNode(target)
   }
 
   const connectedNodes = useMemo(() => {
@@ -88,6 +145,17 @@ export default function GraphPage() {
         ? '技术栈'
         : mode === 'panorama' ? '岗位簇' : '技能簇'
 
+  const modeSummary = mode === 'panorama'
+    ? [`${activeGraph.summary.positionClusterCount} 个岗位簇`, `${activeGraph.summary.positionCount} 个岗位`, `${activeGraph.summary.skillCount} 个技能点`]
+    : [`${activeGraph.summary.techStackCount} 个技术栈`, `${activeGraph.summary.skillCount} 个技能点`, `${activeGraph.summary.positionCount} 个关联岗位`]
+
+  const rootLabel = roots.length > 0
+    ? `${mode === 'panorama' ? '全部岗位簇' : '全部技术栈'} · ${roots.length}`
+    : mode === 'panorama' ? '全部岗位簇' : '全部技术栈'
+  const detailNodes = selectedDetail?.directNodes ?? connectedNodes
+  const requiredSkills = selectedDetail?.requiredSkills.map((item) => ({ skill: { id: item.skillId, name: item.name, type: 'skill' as const, weight: item.weight }, requirementType: item.requirementType })) ?? adjacentSkills.filter((item) => item.requirementType === 'required')
+  const preferredSkills = selectedDetail?.preferredSkills.map((item) => ({ skill: { id: item.skillId, name: item.name, type: 'skill' as const, weight: item.weight }, requirementType: item.requirementType })) ?? adjacentSkills.filter((item) => item.requirementType === 'preferred')
+
   return (
     <div className="graph-workspace">
       <section className="graph-toolbar">
@@ -97,25 +165,29 @@ export default function GraphPage() {
           ))}
         </div>
         <div className="toolbar-group">
-          <button className="filter-button"><Layers3 size={16} />{mode === 'panorama' ? '全部岗位簇' : '全部技术栈'}<ChevronDown size={15} /></button>
+          <button className="filter-button"><Layers3 size={16} />{rootLabel}<ChevronDown size={15} /></button>
         </div>
         <div className="graph-summary">
-          <span><i className="dot-position" />{modeSummary[mode][0]}</span>
-          <span><i className="dot-skill" />{modeSummary[mode][1]}</span>
-          <span><i className="dot-new" />{modeSummary[mode][2]}</span>
+          <span><i className="dot-position" />{modeSummary[0]}</span>
+          <span><i className="dot-skill" />{modeSummary[1]}</span>
+          <span><i className="dot-new" />{modeSummary[2]}</span>
         </div>
       </section>
 
       <div className="graph-layout">
         <aside className="graph-filter-panel">
           <SectionHeader title="图谱筛选" description={activeConfig.description} />
-          <label className="panel-search"><Search size={16} /><input placeholder={mode === 'skill' ? '搜索技术栈、技能或岗位' : '搜索岗位簇、岗位或技能'} /></label>
-          {mode === 'skill' && (
+          <label className="panel-search"><Search size={16} /><input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={mode === 'skill_reverse' ? '搜索技术栈、技能或岗位' : '搜索岗位簇、岗位或技能'} /></label>
+          {searchItems.length > 0 && (
+            <div className="reverse-skill-list">
+              <span>搜索结果</span>
+              {searchItems.map((item) => <button key={item.id} onClick={() => focusNode(item.id)}>{cleanName(item.name)}<em>{item.type}</em></button>)}
+            </div>
+          )}
+          {searchItems.length === 0 && mode === 'skill_reverse' && (
             <div className="reverse-skill-list">
               <span>技能反查入口</span>
-              <button className="active">RAG<em>4 个岗位</em></button>
-              <button>大语言模型<em>12 个岗位</em></button>
-              <button>云原生<em>18 个岗位</em></button>
+              {roots.slice(0, 3).map((root, index) => <button className={index === 0 ? 'active' : ''} key={root.id} onClick={() => focusNode(root.id)}>{cleanName(root.name)}<em>{root.nodeCount} 个节点</em></button>)}
             </div>
           )}
         </aside>
@@ -158,40 +230,40 @@ export default function GraphPage() {
 
           {selectedNode.type === 'stack' && (
             <>
-              <p>技术栈是技能体系的顶层领域，向下连接技能簇、技能点及实际需求岗位。</p>
-              <div className="detail-meta-grid"><div><span>技能簇</span><strong>{connectedNodes.length} 个</strong></div><div><span>技能点</span><strong>68 个</strong></div><div><span>关联岗位</span><strong>36 个</strong></div><div><span>活跃度</span><strong>持续上升</strong></div></div>
-              <div className="detail-block"><span>领域活跃度</span><Confidence value={.91} /></div>
+              <p>{selectedDetail?.description ?? '技术栈是技能体系的顶层领域，向下连接技能簇、技能点及实际需求岗位。'}</p>
+              <div className="detail-meta-grid"><div><span>技能簇</span><strong>{selectedDetail?.clusterCount ?? connectedNodes.length} 个</strong></div><div><span>技能点</span><strong>{selectedDetail?.skillCount ?? 68} 个</strong></div><div><span>关联岗位</span><strong>{selectedDetail?.relatedPositionCount ?? 36} 个</strong></div><div><span>活跃度</span><strong>持续上升</strong></div></div>
+              <div className="detail-block"><span>领域活跃度</span><Confidence value={selectedDetail?.confidence ?? .91} /></div>
             </>
           )}
 
           {selectedNode.type === 'cluster' && (
             <>
-              <p>{mode === 'panorama' ? '岗位簇汇聚职责和技能结构相近的标准岗位，并直接连接岗位层。' : '技能簇归属于技术栈，向下组织含义和用途相近的技能点。'}</p>
-              <div className="detail-meta-grid"><div><span>{mode === 'panorama' ? '标准岗位' : '技能点'}</span><strong>{connectedNodes.length} 个</strong></div><div><span>有效样本</span><strong>218 条</strong></div><div><span>新增节点</span><strong>3 个</strong></div><div><span>近期变化</span><strong>12 项</strong></div></div>
-              <div className="detail-block"><span>直接关联节点</span><div className="tag-list">{connectedNodes.slice(0, 5).map((node) => <em key={node.id}>{cleanName(node.name)}</em>)}</div></div>
-              <div className="detail-block"><span>聚类可信度</span><Confidence value={.89} /></div>
+              <p>{selectedDetail?.description ?? (mode === 'panorama' ? '岗位簇汇聚职责和技能结构相近的标准岗位，并直接连接岗位层。' : '技能簇归属于技术栈，向下组织含义和用途相近的技能点。')}</p>
+              <div className="detail-meta-grid"><div><span>{mode === 'panorama' ? '标准岗位' : '技能点'}</span><strong>{detailNodes.length} 个</strong></div><div><span>有效样本</span><strong>{selectedDetail?.sampleCount || selectedNode.sampleCount || 218} 条</strong></div><div><span>新增节点</span><strong>3 个</strong></div><div><span>近期变化</span><strong>12 项</strong></div></div>
+              <div className="detail-block"><span>直接关联节点</span><div className="tag-list">{detailNodes.slice(0, 5).map((node) => <em key={node.id}>{cleanName(node.name)}</em>)}</div></div>
+              <div className="detail-block"><span>聚类可信度</span><Confidence value={selectedDetail?.confidence ?? selectedNode.confidence ?? .89} /></div>
             </>
           )}
 
           {selectedNode.type === 'position' && (
             <>
-              <p>{cleanName(selectedNode.name)}的标准岗位画像，可查看所属岗位簇以及直接要求的技能点。</p>
-              <div className="detail-meta-grid"><div><span>首次发现</span><strong>{selectedNode.trend === 'new' ? '2025-08-12' : '2023-01-06'}</strong></div><div><span>样本支持</span><strong>38 条</strong></div></div>
-              <div className="detail-block"><span>判定可信度</span><Confidence value={selectedNode.trend === 'new' ? .88 : .93} /></div>
+              <p>{selectedDetail?.description ?? `${cleanName(selectedNode.name)}的标准岗位画像，可查看所属岗位簇以及直接要求的技能点。`}</p>
+              <div className="detail-meta-grid"><div><span>首次发现</span><strong>{selectedDetail?.firstSeen || selectedNode.firstSeen || (selectedNode.trend === 'new' ? '2025-08-12' : '2023-01-06')}</strong></div><div><span>样本支持</span><strong>{selectedDetail?.sampleCount || selectedNode.sampleCount || 38} 条</strong></div></div>
+              <div className="detail-block"><span>判定可信度</span><Confidence value={selectedDetail?.confidence ?? selectedNode.confidence ?? (selectedNode.trend === 'new' ? .88 : .93)} /></div>
               <div className="detail-block adjacent-skill-groups">
                 <span>相邻技能</span>
-                <div><strong>必备</strong><div className="tag-list required-tags">{adjacentSkills.filter((item) => item.requirementType === 'required').map(({ skill }) => <em key={skill.id}>{cleanName(skill.name)}</em>)}</div></div>
-                <div><strong>加分</strong><div className="tag-list preferred-tags">{adjacentSkills.filter((item) => item.requirementType === 'preferred').map(({ skill }) => <em key={skill.id}>{cleanName(skill.name)}</em>)}</div></div>
+                <div><strong>必备</strong><div className="tag-list required-tags">{requiredSkills.map(({ skill }) => <em key={skill.id}>{cleanName(skill.name)}</em>)}</div></div>
+                <div><strong>加分</strong><div className="tag-list preferred-tags">{preferredSkills.map(({ skill }) => <em key={skill.id}>{cleanName(skill.name)}</em>)}</div></div>
               </div>
             </>
           )}
 
           {selectedNode.type === 'skill' && (
             <>
-              <p>{cleanName(selectedNode.name)}是可从 JD 和简历中识别的标准技能点，可反向查看需要该技能的岗位。</p>
-              <div className="detail-meta-grid"><div><span>技能权重</span><strong>{(selectedNode.weight ?? .82).toFixed(2)}</strong></div><div><span>关联岗位</span><strong>{connectedNodes.filter((node) => node.type === 'position').length} 个</strong></div></div>
-              <div className="detail-block"><span>关系可信度</span><Confidence value={.91} /></div>
-              <div className="detail-block"><span>相邻岗位</span><div className="tag-list">{connectedNodes.filter((node) => node.type === 'position').slice(0, 5).map((node) => <em key={node.id}>{cleanName(node.name)}</em>)}</div></div>
+              <p>{selectedDetail?.description ?? `${cleanName(selectedNode.name)}是可从 JD 和简历中识别的标准技能点，可反向查看需要该技能的岗位。`}</p>
+              <div className="detail-meta-grid"><div><span>技能权重</span><strong>{(selectedDetail?.weight ?? selectedNode.weight ?? .82).toFixed(2)}</strong></div><div><span>关联岗位</span><strong>{selectedDetail?.relatedPositionCount ?? connectedNodes.filter((node) => node.type === 'position').length} 个</strong></div></div>
+              <div className="detail-block"><span>关系可信度</span><Confidence value={selectedDetail?.confidence ?? .91} /></div>
+              <div className="detail-block"><span>相邻岗位</span><div className="tag-list">{detailNodes.filter((node) => node.type === 'position').slice(0, 5).map((node) => <em key={node.id}>{cleanName(node.name)}</em>)}</div></div>
             </>
           )}
 

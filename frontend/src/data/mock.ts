@@ -1,6 +1,9 @@
 import type {
+  ChangeEvidence,
   ChangeRecord,
   DashboardSummary,
+  EmergingPosition,
+  EvolutionChange,
   GraphEdge,
   GraphNode,
   LearningStep,
@@ -142,6 +145,93 @@ export const skillReverseEdges: GraphEdge[] = [
   { source: 'reverse_knowledge', target: 'reverse_vector', relationship: 'REQUIRES', requirementType: 'preferred', weight: 0.82 },
   { source: 'reverse_search', target: 'reverse_rag', relationship: 'REQUIRES', requirementType: 'required', weight: 0.76 },
   { source: 'reverse_product', target: 'reverse_agent_skill', relationship: 'REQUIRES', requirementType: 'preferred', weight: 0.63 },
+]
+
+export const evolutionChanges: EvolutionChange[] = [
+  { id: 'change_001', positionId: 'pos_ai_agent_engineer', positionName: 'AI Agent 研发工程师', skillId: 'skill_multi_agent', skillName: '多智能体协作', changeType: 'new', before: null, after: { requirementType: 'preferred', weight: 0.72 }, evidenceCount: 25, confidence: 0.87, detectedAt: '2026-07-29T10:00:00+08:00' },
+  { id: 'change_002', positionId: 'pos_llm_engineer', positionName: '大模型应用工程师', skillId: 'skill_rag_eval', skillName: 'RAG 评测', changeType: 'rising', before: { requirementType: 'preferred', weight: 0.45 }, after: { requirementType: 'required', weight: 0.81 }, evidenceCount: 39, confidence: 0.92, detectedAt: '2026-07-27T10:00:00+08:00' },
+  { id: 'change_003', positionId: 'pos_java_engineer', positionName: 'Java 开发工程师', skillId: 'skill_cloud_native', skillName: '云原生', changeType: 'rising', before: { requirementType: 'preferred', weight: 0.52 }, after: { requirementType: 'required', weight: 0.76 }, evidenceCount: 116, confidence: 0.95, detectedAt: '2026-07-26T10:00:00+08:00' },
+  { id: 'change_004', positionId: 'pos_data_analyst', positionName: '数据分析师', skillId: 'skill_reporting', skillName: '传统报表工具', changeType: 'declining', before: { requirementType: 'required', weight: 0.74 }, after: { requirementType: 'preferred', weight: 0.39 }, evidenceCount: 61, confidence: 0.89, detectedAt: '2026-07-24T10:00:00+08:00' },
+  { id: 'change_005', positionId: 'pos_frontend_engineer', positionName: '前端研发工程师', skillId: 'skill_ai_codegen', skillName: 'AI 辅助开发', changeType: 'new', before: null, after: { requirementType: 'preferred', weight: 0.58 }, evidenceCount: 42, confidence: 0.86, detectedAt: '2026-07-22T10:00:00+08:00' },
+]
+
+export const changeEvidenceMap: Record<string, ChangeEvidence> = {
+  change_001: {
+    changeId: 'change_001',
+    positionId: 'pos_ai_agent_engineer',
+    positionName: 'AI Agent 研发工程师',
+    skillId: 'skill_multi_agent',
+    skillName: '多智能体协作',
+    before: null,
+    after: { requirementType: 'preferred', weight: 0.72 },
+    confidence: 0.87,
+    sourceSupport: { companyCount: 3, jobCount: 25 },
+    windowContinuity: { continuousWindowCount: 3, passed: true },
+    semanticConsistency: 0.94,
+    evidenceIds: ['jd_1001', 'jd_1002', 'jd_1003'],
+  },
+  change_002: {
+    changeId: 'change_002',
+    positionId: 'pos_llm_engineer',
+    positionName: '大模型应用工程师',
+    skillId: 'skill_rag_eval',
+    skillName: 'RAG 评测',
+    before: { requirementType: 'preferred', weight: 0.45 },
+    after: { requirementType: 'required', weight: 0.81 },
+    confidence: 0.92,
+    sourceSupport: { companyCount: 4, jobCount: 39 },
+    windowContinuity: { continuousWindowCount: 3, passed: true },
+    semanticConsistency: 0.96,
+    evidenceIds: ['jd_2001', 'jd_2002', 'jd_2003'],
+  },
+  change_003: {
+    changeId: 'change_003',
+    positionId: 'pos_java_engineer',
+    positionName: 'Java 开发工程师',
+    skillId: 'skill_cloud_native',
+    skillName: '云原生',
+    before: { requirementType: 'preferred', weight: 0.52 },
+    after: { requirementType: 'required', weight: 0.76 },
+    confidence: 0.95,
+    sourceSupport: { companyCount: 5, jobCount: 116 },
+    windowContinuity: { continuousWindowCount: 4, passed: true },
+    semanticConsistency: 0.97,
+    evidenceIds: ['jd_3001', 'jd_3002', 'jd_3003'],
+  },
+  change_004: {
+    changeId: 'change_004',
+    positionId: 'pos_data_analyst',
+    positionName: '数据分析师',
+    skillId: 'skill_reporting',
+    skillName: '传统报表工具',
+    before: { requirementType: 'required', weight: 0.74 },
+    after: { requirementType: 'preferred', weight: 0.39 },
+    confidence: 0.89,
+    sourceSupport: { companyCount: 3, jobCount: 61 },
+    windowContinuity: { continuousWindowCount: 2, passed: true },
+    semanticConsistency: 0.9,
+    evidenceIds: ['jd_4001', 'jd_4002', 'jd_4003'],
+  },
+  change_005: {
+    changeId: 'change_005',
+    positionId: 'pos_frontend_engineer',
+    positionName: '前端研发工程师',
+    skillId: 'skill_ai_codegen',
+    skillName: 'AI 辅助开发',
+    before: null,
+    after: { requirementType: 'preferred', weight: 0.58 },
+    confidence: 0.86,
+    sourceSupport: { companyCount: 2, jobCount: 42 },
+    windowContinuity: { continuousWindowCount: 2, passed: true },
+    semanticConsistency: 0.88,
+    evidenceIds: ['jd_5001', 'jd_5002', 'jd_5003'],
+  },
+}
+
+export const emergingPositions: EmergingPosition[] = [
+  { id: 'emerging_001', positionId: 'pos_ai_agent_engineer', name: 'AI Agent 研发工程师', description: '聚焦智能体编排、工具调用与工作流研发', growthRate: 1.68, confidence: 0.93, firstSeen: '2025-03-01', sourceCount: 4, sampleCount: 52, skills: [{ id: 'skill_langchain', name: 'LangChain' }, { id: 'skill_rag', name: 'RAG' }, { id: 'skill_multi_agent', name: '多智能体协作' }] },
+  { id: 'emerging_002', positionId: 'pos_embodied_data_engineer', name: '具身智能数据工程师', description: '负责机器人多模态数据采集、治理与训练管线', growthRate: 1.24, confidence: 0.88, firstSeen: '2025-08-01', sourceCount: 3, sampleCount: 34, skills: [{ id: 'skill_ros', name: 'ROS' }, { id: 'skill_multimodal', name: '多模态数据' }, { id: 'skill_data_loop', name: '数据闭环' }] },
+  { id: 'emerging_003', positionId: 'pos_model_security_engineer', name: '大模型安全工程师', description: '建设模型安全评测、攻击防护与合规体系', growthRate: 0.97, confidence: 0.91, firstSeen: '2025-06-01', sourceCount: 5, sampleCount: 28, skills: [{ id: 'skill_red_team', name: '红队评测' }, { id: 'skill_alignment', name: '安全对齐' }, { id: 'skill_content_security', name: '内容安全' }] },
 ]
 
 export const changes: ChangeRecord[] = [

@@ -3,11 +3,9 @@
 __pycache__/
 *.py[cod]
 
-node_modules/
 frontend/node_modules/
-dist/
-build/
-.vite/
+frontend/dist/
+frontend/.vite/
 *.tsbuildinfo
 
 tmp/

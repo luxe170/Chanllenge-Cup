@@ -11,6 +11,13 @@ export interface DashboardSummary {
   metrics: EvaluationMetric[]
 }
 
+export interface EvaluationSummary {
+  metrics: EvaluationMetric[]
+  pendingReviewCount: number
+  highPriorityReviewCount: number
+  testedAt: string
+}
+
 export interface EvaluationMetric {
   name: string
   value: number
@@ -57,6 +64,43 @@ export interface GraphData {
   truncated?: boolean
 }
 
+export interface GraphRoot {
+  id: string
+  name: string
+  nodeCount: number
+}
+
+export interface GraphSearchItem {
+  id: string
+  type: GraphNode['type']
+  name: string
+}
+
+export interface GraphSkillLink {
+  skillId: string
+  name: string
+  requirementType: RequirementType
+  weight: number
+  confidence: number
+}
+
+export interface GraphNodeDetail {
+  id: string
+  type: GraphNode['type']
+  name: string
+  description: string
+  sampleCount: number
+  firstSeen: string
+  confidence: number
+  directNodes: GraphSearchItem[]
+  requiredSkills: GraphSkillLink[]
+  preferredSkills: GraphSkillLink[]
+  relatedPositionCount: number
+  skillCount: number
+  clusterCount: number
+  weight?: number
+}
+
 export interface SkillRequirement {
   id: string
   name: string
@@ -87,6 +131,78 @@ export interface PositionProfile {
   requirements: SkillRequirement[]
 }
 
+export type ChangeType = 'new' | 'rising' | 'declining'
+
+export interface RequirementSnapshot {
+  requirementType: 'required' | 'preferred'
+  weight: number
+}
+
+export interface EvolutionChange {
+  id: string
+  positionId: string
+  positionName: string
+  skillId: string
+  skillName: string
+  changeType: ChangeType
+  before: RequirementSnapshot | null
+  after: RequirementSnapshot
+  evidenceCount: number
+  confidence: number
+  detectedAt: string
+}
+
+export interface ChangeEvidence {
+  changeId: string
+  positionId: string
+  positionName: string
+  skillId: string
+  skillName: string
+  before: RequirementSnapshot | null
+  after: RequirementSnapshot
+  confidence: number
+  sourceSupport: {
+    companyCount: number
+    jobCount: number
+  }
+  windowContinuity: {
+    continuousWindowCount: number
+    passed: boolean
+  }
+  semanticConsistency: number
+  evidenceIds: string[]
+}
+
+export interface EmergingSkill {
+  id: string
+  name: string
+}
+
+export interface EmergingPosition {
+  id: string
+  positionId: string
+  name: string
+  description: string
+  growthRate: number
+  confidence: number
+  firstSeen: string
+  sourceCount: number
+  sampleCount: number
+  skills: EmergingSkill[]
+}
+
+export interface EvidenceDetail {
+  evidenceId: string
+  company: string
+  positionTitle: string
+  sourcePlatform: string
+  publishedAt: string
+  url: string
+  jdText: string
+  excerpt: string
+  matchedSkill: string
+}
+
 export interface ChangeRecord {
   id: string
   position: string
@@ -106,6 +222,32 @@ export interface ResumeSkill {
   confidence: number
 }
 
+export interface ResumeExperience {
+  period: string
+  title: string
+  description: string
+  skills: string[]
+}
+
+export interface ParsedResumeProfile {
+  candidateName: string
+  targetPosition: string
+  education: string
+  experienceYears: number
+  direction: string
+  completeness: number
+  skills: ResumeSkill[]
+  experiences: ResumeExperience[]
+}
+
+export interface ResumeTask {
+  taskId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  progress: number
+  error?: string
+  result?: ParsedResumeProfile
+}
+
 export interface MatchDimension {
   name: string
   value: number
@@ -120,6 +262,37 @@ export interface LearningStep {
   goal: string
 }
 
+export interface SkillGap {
+  name: string
+  priority: string
+  requirement: string
+  current: string
+  weight: number
+}
+
+export interface MatchReport {
+  matchId: string
+  resumeTaskId: string
+  positionId: string
+  positionName: string
+  candidateName: string
+  overallScore: number
+  fitLevel: string
+  benchmarkRank: string
+  benchmarkSampleCount: number
+  summary: string
+  dimensions: MatchDimension[]
+  strengths: string[]
+  gaps: SkillGap[]
+  evidence: {
+    skillEvidenceCount: number
+    projectEvidenceCount: number
+    jobSampleCount: number
+  }
+  suggestions: string[]
+  learningPath: LearningStep[]
+}
+
 export interface ReviewItem {
   id: string
   type: '新岗位' | '能力变更' | '技能归一'
@@ -129,6 +302,8 @@ export interface ReviewItem {
   sources: string[]
   createdAt: string
   status: ReviewStatus
+  targetId?: string
+  note?: string
 }
 
 export interface ApiResponse<T> {

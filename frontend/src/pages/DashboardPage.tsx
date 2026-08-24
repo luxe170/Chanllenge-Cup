@@ -1,9 +1,17 @@
 import { ArrowRight, BriefcaseBusiness, Database, GitBranch, Sparkles, TrendingUp } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { MetricCard } from '../components/common'
 import { dashboardSummary } from '../data/mock'
 import { AppLink } from '../router'
+import { api } from '../services/api'
 
 export default function DashboardPage() {
+  const [summary, setSummary] = useState(dashboardSummary)
+
+  useEffect(() => {
+    api.getDashboard().then((res) => setSummary(res.data)).catch(() => setSummary(dashboardSummary))
+  }, [])
+
   return (
     <div className="page-stack dashboard-page">
       <section className="welcome-banner">
@@ -26,9 +34,9 @@ export default function DashboardPage() {
       </section>
 
       <section className="metric-grid">
-        <MetricCard icon={Database} label="有效岗位样本" value={dashboardSummary.validCount} change="+12.4%" tone="cyan" />
-        <MetricCard icon={BriefcaseBusiness} label="新兴岗位" value={dashboardSummary.emergingCount} change="+3" tone="violet" />
-        <MetricCard icon={TrendingUp} label="能力变更" value={dashboardSummary.changedCount} change="+8.6%" tone="green" />
+        <MetricCard icon={Database} label="有效岗位样本" value={summary.validCount} change="+12.4%" tone="cyan" />
+        <MetricCard icon={BriefcaseBusiness} label="新兴岗位" value={summary.emergingCount} change="+3" tone="violet" />
+        <MetricCard icon={TrendingUp} label="能力变更" value={summary.changedCount} change="+8.6%" tone="green" />
       </section>
     </div>
   )

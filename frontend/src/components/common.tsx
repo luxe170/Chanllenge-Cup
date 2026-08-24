@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Trend } from '../types'
 
@@ -44,4 +44,18 @@ export function Confidence({ value }: { value: number }) {
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="empty-state">{children}</div>
+}
+
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{title}</h3>
+          <button className="modal-close" onClick={onClose} aria-label="关闭"><X size={17} /></button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  )
 }
