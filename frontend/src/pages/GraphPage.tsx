@@ -70,6 +70,8 @@ export default function GraphPage() {
   const [searchItems, setSearchItems] = useState<GraphSearchItem[]>([])
   const [scale, setScale] = useState(1)
   const [resetSignal, setResetSignal] = useState(0)
+  const [selectedRootId, setSelectedRootId] = useState('')
+  const [rootMenuOpen, setRootMenuOpen] = useState(false)
   const activeConfig = modeConfig[mode]
 
   useEffect(() => {
@@ -114,6 +116,8 @@ export default function GraphPage() {
     setKeyword('')
     setSearchItems([])
     setScale(1)
+    setSelectedRootId('')
+    setRootMenuOpen(false)
     setResetSignal((value) => value + 1)
   }
 
@@ -122,20 +126,49 @@ export default function GraphPage() {
     if (target) setSelectedNode(target)
   }
 
+  const displayedGraph = useMemo<GraphData>(() => {
+    if (!selectedRootId) return activeGraph
+    const included = new Set<string>([selectedRootId])
+    let changed = true
+    while (changed) {
+      changed = false
+      activeGraph.edges.forEach((edge) => {
+        const followsHierarchy = included.has(edge.target)
+        const followsPositionSkills = mode === 'panorama' && edge.relationship === 'REQUIRES' && included.has(edge.source)
+        if ((followsHierarchy || followsPositionSkills) && !included.has(edge.source)) { included.add(edge.source); changed = true }
+        if (followsPositionSkills && !included.has(edge.target)) { included.add(edge.target); changed = true }
+      })
+    }
+    const nodes = activeGraph.nodes.filter((node) => included.has(node.id))
+    const edges = activeGraph.edges.filter((edge) => included.has(edge.source) && included.has(edge.target))
+    return {
+      ...activeGraph,
+      nodes,
+      edges,
+      summary: {
+        positionClusterCount: nodes.filter((node) => mode === 'panorama' && node.type === 'cluster').length,
+        techStackCount: nodes.filter((node) => node.type === 'stack').length,
+        skillClusterCount: nodes.filter((node) => mode === 'skill_reverse' && node.type === 'cluster').length,
+        positionCount: nodes.filter((node) => node.type === 'position').length,
+        skillCount: nodes.filter((node) => node.type === 'skill').length,
+      },
+    }
+  }, [activeGraph, mode, selectedRootId])
+
   const connectedNodes = useMemo(() => {
-    const ids = activeGraph.edges.flatMap((edge) => {
+    const ids = displayedGraph.edges.flatMap((edge) => {
       if (edge.source === selectedNode.id) return [edge.target]
       if (edge.target === selectedNode.id) return [edge.source]
       return []
     })
-    return activeGraph.nodes.filter((node) => ids.includes(node.id))
-  }, [activeGraph, selectedNode.id])
+    return displayedGraph.nodes.filter((node) => ids.includes(node.id))
+  }, [displayedGraph, selectedNode.id])
 
-  const adjacentSkills = useMemo(() => activeGraph.edges.flatMap((edge) => {
+  const adjacentSkills = useMemo(() => displayedGraph.edges.flatMap((edge) => {
     if (edge.relationship !== 'REQUIRES' || edge.source !== selectedNode.id) return []
-    const skill = activeGraph.nodes.find((node) => node.id === edge.target && node.type === 'skill')
+    const skill = displayedGraph.nodes.find((node) => node.id === edge.target && node.type === 'skill')
     return skill ? [{ skill, requirementType: edge.requirementType ?? 'required' }] : []
-  }), [activeGraph, selectedNode.id])
+  }), [displayedGraph, selectedNode.id])
 
   const nodeTypeLabel = selectedNode.type === 'position'
     ? '岗位'
@@ -146,12 +179,14 @@ export default function GraphPage() {
         : mode === 'panorama' ? '岗位簇' : '技能簇'
 
   const modeSummary = mode === 'panorama'
-    ? [`${activeGraph.summary.positionClusterCount} 个岗位簇`, `${activeGraph.summary.positionCount} 个岗位`, `${activeGraph.summary.skillCount} 个技能点`]
-    : [`${activeGraph.summary.techStackCount} 个技术栈`, `${activeGraph.summary.skillCount} 个技能点`, `${activeGraph.summary.positionCount} 个关联岗位`]
+    ? [`${displayedGraph.summary.positionClusterCount} 个岗位簇`, `${displayedGraph.summary.positionCount} 个岗位`, `${displayedGraph.summary.skillCount} 个技能点`]
+    : [`${displayedGraph.summary.techStackCount} 个技术栈`, `${displayedGraph.summary.skillCount} 个技能点`, `${displayedGraph.summary.positionCount} 个关联岗位`]
 
-  const rootLabel = roots.length > 0
+  const selectedRoot = roots.find((root) => root.id === selectedRootId)
+  const rootLabel = selectedRoot?.name ?? (roots.length > 0
     ? `${mode === 'panorama' ? '全部岗位簇' : '全部技术栈'} · ${roots.length}`
     : mode === 'panorama' ? '全部岗位簇' : '全部技术栈'
+  )
   const detailNodes = selectedDetail?.directNodes ?? connectedNodes
   const requiredSkills = selectedDetail?.requiredSkills.map((item) => ({ skill: { id: item.skillId, name: item.name, type: 'skill' as const, weight: item.weight }, requirementType: item.requirementType })) ?? adjacentSkills.filter((item) => item.requirementType === 'required')
   const preferredSkills = selectedDetail?.preferredSkills.map((item) => ({ skill: { id: item.skillId, name: item.name, type: 'skill' as const, weight: item.weight }, requirementType: item.requirementType })) ?? adjacentSkills.filter((item) => item.requirementType === 'preferred')
@@ -165,7 +200,11 @@ export default function GraphPage() {
           ))}
         </div>
         <div className="toolbar-group">
-          <button className="filter-button"><Layers3 size={16} />{rootLabel}<ChevronDown size={15} /></button>
+          <button className="filter-button" aria-expanded={rootMenuOpen} onClick={() => setRootMenuOpen((value) => !value)}><Layers3 size={16} />{rootLabel}<ChevronDown size={15} /></button>
+          {rootMenuOpen && <div className="root-filter-menu">
+            <button className={!selectedRootId ? 'active' : ''} onClick={() => { setSelectedRootId(''); setRootMenuOpen(false); setSelectedNode(activeGraph.nodes[0]) }}>{mode === 'panorama' ? '全部岗位簇' : '全部技术栈'}</button>
+            {roots.map((root) => <button className={selectedRootId === root.id ? 'active' : ''} key={root.id} onClick={() => { setSelectedRootId(root.id); setRootMenuOpen(false); focusNode(root.id); setResetSignal((value) => value + 1) }}>{cleanName(root.name)}<span>{root.nodeCount}</span></button>)}
+          </div>}
         </div>
         <div className="graph-summary">
           <span><i className="dot-position" />{modeSummary[0]}</span>
@@ -202,8 +241,8 @@ export default function GraphPage() {
               {layerGuides[mode].map((layer) => <span key={layer.label} style={{ top: layer.top }}>{layer.label}</span>)}
             </div>
             <Graph3D
-              nodes={activeGraph.nodes}
-              edges={activeGraph.edges}
+              nodes={displayedGraph.nodes}
+              edges={displayedGraph.edges}
               selectedNodeId={selectedNode.id}
               scale={scale}
               resetSignal={resetSignal}

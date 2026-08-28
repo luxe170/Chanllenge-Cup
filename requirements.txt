@@ -2,3 +2,5 @@ playwright>=1.49,<2
 fastapi>=0.111.0,<1.0.0
 uvicorn[standard]>=0.30.0,<1.0.0
 pydantic>=2.7.0,<3.0.0
+python-multipart>=0.0.18,<1.0.0
+pypdf>=5.0.0,<7.0.0

@@ -26,6 +26,7 @@ export default function ResumePage() {
   const [parsed, setParsed] = useState(true)
   const [profile, setProfile] = useState<ParsedResumeProfile>(fallbackProfile)
   const [taskId, setTaskId] = useState('demo_resume_task')
+  const [parseError, setParseError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -38,16 +39,21 @@ export default function ResumePage() {
     setFileName(file.name)
     setParsing(true)
     setParsed(false)
+    setParseError('')
     api.createResumeTask(file)
       .then((res) => api.getResumeTask(res.data.taskId))
       .then((res) => {
         setTaskId(res.data.taskId)
+        window.sessionStorage.setItem('latestResumeTaskId', res.data.taskId)
         if (res.data.result) setProfile(res.data.result)
+        setParsed(true)
       })
-      .catch(() => setProfile(fallbackProfile))
+      .catch((error) => {
+        setParseError(error instanceof Error ? error.message : '简历解析失败')
+        setParsed(false)
+      })
       .finally(() => {
         setParsing(false)
-        setParsed(true)
       })
   }
 
@@ -68,9 +74,10 @@ export default function ResumePage() {
         <aside className="panel upload-panel">
           <SectionHeader eyebrow="STEP 01" title="上传简历" description="单个文件不超过 10 MB" />
           <button className={`dropzone ${parsing ? 'parsing' : ''}`} onClick={() => inputRef.current?.click()}>
-            <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" onChange={(event) => event.target.files?.[0] && parseResume(event.target.files[0])} />
+            <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.txt" onChange={(event) => event.target.files?.[0] && parseResume(event.target.files[0])} />
             {parsing ? <><LoaderCircle size={34} className="spinner" /><strong>正在解析简历</strong><span>建立技能实体链接...</span></> : <><span className="upload-icon"><UploadCloud size={28} /></span><strong>拖拽文件到这里，或点击上传</strong><span>支持 PDF / DOC / DOCX</span></>}
           </button>
+          {parseError && <p role="alert">{parseError}</p>}
           {fileName && <div className="file-item"><span><FileText size={19} /></span><div><strong>{fileName}</strong><small>1.8 MB · {parsed ? '解析完成' : '处理中'}</small></div>{parsed ? <CheckCircle2 size={18} className="success-icon" /> : <LoaderCircle size={18} className="spinner" />}</div>}
           <button className="ghost-button full-button" onClick={() => inputRef.current?.click()}><RotateCcw size={15} />重新上传</button>
           <div className="parser-metric"><WandSparkles size={18} /><div><strong>92.4% 简历提取准确率</strong><span>基于 108 份人工标注简历验证</span></div></div>

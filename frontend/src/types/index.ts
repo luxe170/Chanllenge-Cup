@@ -11,6 +11,21 @@ export interface DashboardSummary {
   metrics: EvaluationMetric[]
 }
 
+export interface JdBatch {
+  id: string
+  filename: string
+  status: 'classified' | 'reviewing' | 'applied'
+  inputCount: number
+  validCount: number
+  rejectedCount: number
+  newPositionCount: number
+  changeCount: number
+  noChangeCount: number
+  pendingReviewCount: number
+  createdAt: string
+  appliedAt?: string | null
+}
+
 export interface EvaluationSummary {
   metrics: EvaluationMetric[]
   pendingReviewCount: number

@@ -1,6 +1,13 @@
 import unittest
+from datetime import datetime
+from unittest.mock import patch
 
-from backend.app.services.evolution_service import compute_evolution_changes, compute_evidence_detail, compute_emerging_positions
+from backend.app.services.evolution_service import (
+    _position_for_record,
+    compute_evolution_changes,
+    compute_evidence_detail,
+    compute_emerging_positions,
+)
 
 
 class EvolutionServiceTest(unittest.TestCase):
@@ -26,6 +33,51 @@ class EvolutionServiceTest(unittest.TestCase):
         self.assertIn("total", payload)
         self.assertIn("page", payload)
         self.assertIn("pageSize", payload)
+
+    def test_known_position_growth_is_not_a_new_position(self):
+        records = [
+            {
+                "title": "Java 后端工程师",
+                "company": f"公司{index % 3}",
+                "description": "Java Spring 微服务开发",
+                "requirement": "熟悉 Java、Spring 和 Docker",
+                "publish_time": f"2026-0{index + 1}-01T00:00:00",
+                "_parsed_time": datetime(2026, index + 1, 1),
+                "_position_id": "pos_java_engineer",
+            }
+            for index in range(5)
+        ]
+        with patch("backend.app.services.evolution_service._load_job_records", return_value=records):
+            payload = compute_emerging_positions()
+        self.assertEqual(payload["total"], 0)
+
+    def test_unknown_recent_multisource_title_is_a_new_position_candidate(self):
+        records = [
+            {
+                "title": "具身智能数据工程师",
+                "company": f"公司{index}",
+                "description": "负责机器人数据和多模态大模型训练",
+                "requirement": "熟悉 Python、大模型、Docker 与数据处理",
+                "publish_time": f"2026-0{index * 2 + 1}-01T00:00:00",
+                "_parsed_time": datetime(2026, index * 2 + 1, 1),
+                "_position_id": "candidate_embodied_data",
+            }
+            for index in range(3)
+        ]
+        with patch("backend.app.services.evolution_service._load_job_records", return_value=records):
+            payload = compute_emerging_positions()
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(payload["items"][0].name, "具身智能数据工程师")
+
+    def test_unmatched_title_is_not_folded_into_agent_position(self):
+        position_id = _position_for_record(
+            {
+                "title": "量子计算系统工程师",
+                "description": "使用 Python 和大语言模型构建研发工具",
+                "requirement": "熟悉 LLM 与 RAG",
+            }
+        )
+        self.assertTrue(position_id.startswith("candidate_"))
 
 
 if __name__ == "__main__":

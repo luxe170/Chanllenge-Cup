@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { SectionHeader } from '../components/common'
 import { learningPath, matchDimensions, positionProfile } from '../data/mock'
 import { api } from '../services/api'
-import type { MatchReport } from '../types'
+import type { GraphNode, MatchReport } from '../types'
 
 const fallbackReport: MatchReport = {
   matchId: 'fallback_match',
@@ -32,39 +32,58 @@ const fallbackReport: MatchReport = {
 export default function MatchPage() {
   const [selectedStage, setSelectedStage] = useState(1)
   const [report, setReport] = useState<MatchReport>(fallbackReport)
+  const [positions, setPositions] = useState<GraphNode[]>([])
+  const [positionId, setPositionId] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [matchError, setMatchError] = useState('')
+  const resumeTaskId = window.sessionStorage.getItem('latestResumeTaskId') ?? 'demo_resume_task'
 
-  const refreshMatch = () => {
-    api.createMatch('demo_resume_task', positionProfile.id)
+  const refreshMatch = (targetPositionId = positionId) => {
+    if (!targetPositionId) return
+    setLoading(true)
+    setMatchError('')
+    api.createMatch(resumeTaskId, targetPositionId)
       .then(async (res) => {
         const path = await api.getLearningPath(res.data.matchId)
         setReport({ ...res.data, learningPath: path.data.items })
+        setSelectedStage(path.data.items[0]?.stage ?? 1)
       })
-      .catch(() => setReport(fallbackReport))
+      .catch((error) => setMatchError(error instanceof Error ? error.message : '匹配计算失败'))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    refreshMatch()
+    api.getGraph('panorama')
+      .then((res) => {
+        const available = res.data.nodes.filter((node) => node.type === 'position')
+        setPositions(available)
+        const initial = available.find((node) => node.name.includes('AI Agent'))?.id ?? available[0]?.id ?? ''
+        setPositionId(initial)
+        refreshMatch(initial)
+      })
+      .catch((error) => setMatchError(error instanceof Error ? error.message : '无法加载岗位列表'))
   }, [])
 
   return (
     <div className="page-stack match-page">
       <section className="match-selector panel">
-        <div className="candidate-selector"><span className="candidate-avatar">{report.candidateName.slice(0, 1)}</span><div><small>候选人</small><strong>{report.candidateName}</strong></div><ChevronDown size={16} /></div>
+        <div className="candidate-selector"><span className="candidate-avatar">{report.candidateName.slice(0, 1)}</span><div><small>候选人</small><strong>{report.candidateName}</strong></div></div>
         <div className="matching-arrow"><span /><Target size={22} /><span /></div>
-        <div className="position-selector"><span className="position-icon"><Sparkles size={20} /></span><div><small>目标岗位</small><strong>{report.positionName}</strong></div><ChevronDown size={16} /></div>
-        <button className="primary-button" onClick={refreshMatch}>重新计算匹配</button>
+        <div className="position-selector"><span className="position-icon"><Sparkles size={20} /></span><div><small>目标岗位</small><select value={positionId} onChange={(event) => setPositionId(event.target.value)}>{positions.map((position) => <option value={position.id} key={position.id}>{position.name}</option>)}</select></div><ChevronDown size={16} /></div>
+        <button className="primary-button" disabled={loading || !positionId} onClick={() => refreshMatch()}>{loading ? '计算中…' : '重新计算匹配'}</button>
       </section>
+      {matchError && <p role="alert">匹配失败：{matchError}</p>}
 
       <section className="match-overview-grid">
         <article className="panel match-score-card">
-          <span className="section-eyebrow">OVERALL MATCH</span><div className="score-ring"><div><strong>{report.overallScore}</strong><span>匹配度</span></div></div><h2>{report.fitLevel}</h2><p>{report.summary}</p><div className="benchmark"><span>候选人排名</span><strong>{report.benchmarkRank}</strong><small>同方向 {report.benchmarkSampleCount} 份画像</small></div>
+          <span className="section-eyebrow">OVERALL MATCH</span><div className="score-ring"><div><strong>{report.overallScore}</strong><span>匹配度</span></div></div><h2>{report.fitLevel}</h2><p>{report.summary}</p><div className="benchmark"><span>候选人排名</span><strong>{report.benchmarkRank}</strong><small>{report.benchmarkSampleCount ? `同方向 ${report.benchmarkSampleCount} 份画像` : '尚无真实排名样本'}</small></div>
         </article>
         <article className="panel dimension-card">
           <SectionHeader eyebrow="DIMENSION SCORE" title="多维能力匹配" description="结合要求类型、技能权重和项目证据计算" />
           <div className="dimension-list">
             {report.dimensions.map((dimension) => <div key={dimension.name}><span>{dimension.name}</span><div><i style={{ width: `${dimension.value}%`, background: dimension.color }} /></div><strong>{dimension.value}</strong></div>)}
           </div>
-          <div className="match-insight"><Lightbulb size={17} /><p><strong>关键结论：</strong>项目经验与必备技能匹配较好；加分技能覆盖不足，是当前主要差距。</p></div>
+          <div className="match-insight"><Lightbulb size={17} /><p><strong>关键结论：</strong>{report.summary}</p></div>
         </article>
         <article className="panel evidence-card">
           <SectionHeader eyebrow="EVIDENCE" title="匹配依据" />
@@ -87,7 +106,7 @@ export default function MatchPage() {
 
         <article className="panel fit-card">
           <SectionHeader eyebrow="ROLE FIT" title="岗位适配建议" />
-          <div className="fit-level"><div><span>当前适配等级</span><strong>B+</strong></div><p>具备直接投递基础，建议用一个完整的 Agent 项目强化差异化竞争力。</p></div>
+          <div className="fit-level"><div><span>当前适配等级</span><strong>{report.overallScore >= 80 ? 'A' : report.overallScore >= 60 ? 'B' : 'C'}</strong></div><p>{report.summary}</p></div>
           <ul>{report.suggestions.map((suggestion) => <li key={suggestion}><CheckCircle2 size={16} />{suggestion}</li>)}</ul>
         </article>
       </section>

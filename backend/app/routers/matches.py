@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from backend.app.responses import ok
@@ -14,9 +14,15 @@ class MatchRequest(BaseModel):
 
 @router.post("/matches")
 def matches(payload: MatchRequest) -> dict:
-    return ok(create_match(payload.resumeTaskId, payload.positionId))
+    try:
+        return ok(create_match(payload.resumeTaskId, payload.positionId))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/matches/{match_id}/learning-path")
 def learning_path(match_id: str) -> dict:
-    return ok(get_learning_path(match_id))
+    try:
+        return ok(get_learning_path(match_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

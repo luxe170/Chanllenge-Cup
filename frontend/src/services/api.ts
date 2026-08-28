@@ -1,4 +1,4 @@
-import type { ApiResponse, ChangeEvidence, DashboardSummary, EvaluationSummary, EvidenceDetail, EvolutionChange, EmergingPosition, GraphData, GraphMode, GraphNodeDetail, GraphRoot, GraphSearchItem, MatchReport, PositionProfile, ResumeSkill, ResumeTask, ReviewItem, ReviewStatus } from '../types'
+import type { ApiResponse, ChangeEvidence, DashboardSummary, EvaluationSummary, EvidenceDetail, EvolutionChange, EmergingPosition, GraphData, GraphMode, GraphNodeDetail, GraphRoot, GraphSearchItem, JdBatch, MatchReport, PositionProfile, ResumeSkill, ResumeTask, ReviewItem, ReviewStatus } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
@@ -22,7 +22,9 @@ const withQuery = (path: string, params?: RequestOptions['params']) => {
 
 const request = async <T>(path: string, options: RequestOptions = {}): Promise<ApiResponse<T>> => {
   const headers = new Headers()
-  const init: RequestInit = { method: options.method ?? 'GET' }
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 30_000)
+  const init: RequestInit = { method: options.method ?? 'GET', signal: controller.signal }
 
   if (options.body instanceof FormData) {
     init.body = options.body
@@ -32,14 +34,32 @@ const request = async <T>(path: string, options: RequestOptions = {}): Promise<A
   }
 
   init.headers = headers
-  const response = await fetch(`${API_BASE}${withQuery(path, options.params)}`, init)
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText}`)
+  try {
+    const response = await fetch(`${API_BASE}${withQuery(path, options.params)}`, init)
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`
+      try {
+        const payload = await response.json() as { detail?: string }
+        if (payload.detail) detail = payload.detail
+      } catch { /* keep HTTP status as fallback */ }
+      throw new Error(detail)
+    }
+    return response.json() as Promise<ApiResponse<T>>
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw new Error('请求超时，请检查后端服务或简历文件')
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
   }
-  return response.json() as Promise<ApiResponse<T>>
 }
 
 export const api = {
+  getJdBatches: (): Promise<ApiResponse<JdBatch[]>> => request<JdBatch[]>('/api/v1/jd-batches'),
+  createJdBatch: (file: File): Promise<ApiResponse<JdBatch>> => {
+    const body = new FormData()
+    body.set('file', file)
+    return request<JdBatch>('/api/v1/jd-batches', { method: 'POST', body })
+  },
   getDashboard: (): Promise<ApiResponse<DashboardSummary>> => request<DashboardSummary>('/api/v1/dashboard'),
   getDashboardSummary: (): Promise<ApiResponse<DashboardSummary>> => request<DashboardSummary>('/api/v1/dashboard/summary'),
   getEvaluationSummary: (): Promise<ApiResponse<EvaluationSummary>> => request<EvaluationSummary>('/api/v1/evaluations/summary'),
