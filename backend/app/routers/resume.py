@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.app.responses import ok
@@ -12,17 +12,16 @@ class ResumeSkillsPatch(BaseModel):
 
 
 @router.post("/resume-tasks")
-async def resume_tasks(request: Request) -> dict:
-    filename = ""
-    content_type = request.headers.get("content-type", "")
-    if "multipart/form-data" in content_type:
-        try:
-            form = await request.form()
-            upload = form.get("file")
-            filename = getattr(upload, "filename", "") or ""
-        except Exception:
-            filename = ""
-    return ok(create_resume_task(filename=filename))
+async def resume_tasks(file: UploadFile = File(...)) -> dict:
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="上传的简历为空")
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="简历不能超过 10 MB")
+    try:
+        return ok(create_resume_task(filename=file.filename or "resume", content=content))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/resume-tasks/{task_id}")

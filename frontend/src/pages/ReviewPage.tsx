@@ -18,6 +18,8 @@ export default function ReviewPage() {
   const [activeId, setActiveId] = useState(initialReviewItems[0].id)
   const [keyword, setKeyword] = useState('')
   const [note, setNote] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const active = items.find((item) => item.id === activeId) ?? items[0]
 
   useEffect(() => {
@@ -26,9 +28,9 @@ export default function ReviewPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      api.getReviews({ keyword }).then((res) => {
+      api.getReviews({ status: 'pending', keyword }).then((res) => {
       setItems(res.data)
-      if (res.data.length) setActiveId(res.data[0].id)
+      setActiveId(res.data[0]?.id ?? '')
     }).catch(() => setItems(initialReviewItems))
     }, 250)
     return () => window.clearTimeout(timer)
@@ -39,11 +41,23 @@ export default function ReviewPage() {
   }, [active?.id, active?.note])
 
   const review = async (status: ReviewStatus) => {
+    if (!active) return
+    setSubmitting(true)
+    setActionMessage('')
     try {
       const res = await api.decideReview(activeId, status, note)
-      setItems((current) => current.map((item) => item.id === activeId ? { ...item, status: res.data.status, note: res.data.note } : item))
-    } catch {
-      setItems((current) => current.map((item) => item.id === activeId ? { ...item, status, note } : item))
+      setItems((current) => {
+        const remaining = current.filter((item) => item.id !== activeId)
+        setActiveId(remaining[0]?.id ?? '')
+        return remaining
+      })
+      setActionMessage(status === 'approved'
+        ? active.type === '新岗位' ? '审核通过，岗位已更新到正式图谱' : '审核通过，结果已保存'
+        : '已驳回并保存审核意见')
+    } catch (error) {
+      setActionMessage(error instanceof Error ? `操作失败：${error.message}` : '操作失败，请检查后端服务')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -71,7 +85,8 @@ export default function ReviewPage() {
             <div className="detail-block"><span>来源交叉验证</span><div className="source-list">{active.sources.map((source) => <div key={source}><span>{source.slice(0, 1)}</span><strong>{source}</strong><CheckCircle2 size={15} /></div>)}</div></div>
             <div className="review-reasoning"><span><Sparkles size={16} />系统判定依据</span><ul><li>岗位名称新颖度达到 0.86</li><li>技能组合与最近岗位差异度超过阈值</li><li>连续三个时间窗口稳定增长</li><li>多来源语义描述一致性达到 92%</li></ul></div>
             <label className="review-note"><span>审核备注</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="补充审核意见（选填）" /></label>
-            <div className="review-actions"><button className="reject-button" onClick={() => review('rejected')}><X size={16} />驳回修正</button><button className="approve-button" onClick={() => review('approved')}><Check size={16} />确认通过</button></div>
+            {actionMessage && <p role="status">{actionMessage}</p>}
+            <div className="review-actions"><button className="reject-button" disabled={submitting} onClick={() => review('rejected')}><X size={16} />驳回修正</button><button className="approve-button" disabled={submitting} onClick={() => review('approved')}><Check size={16} />{submitting ? '处理中…' : '确认通过'}</button></div>
           </aside>}
         </div>
       </section>

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from backend.app.services.data_sources import write_jsonl
+from backend.app.services.data_sources import read_jsonl, write_jsonl
 from backend.app.services.evolution_service import (
     POSITION_NAME_MAP,
     SKILL_ALIASES,
@@ -57,6 +57,10 @@ def build_graph_seed() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     edges: dict[str, dict[str, Any]] = {}
 
     for position_id, position_records in by_position.items():
+        # New-position candidates enter the formal graph only after review and
+        # registration in the standard position library.
+        if position_id.startswith("candidate_"):
+            continue
         cluster_id, cluster_name = POSITION_CLUSTER_MAP.get(position_id, ("position_cluster_other", "其他技术岗位簇"))
         nodes[cluster_id] = {
             "mode": "panorama",
@@ -140,15 +144,93 @@ def build_graph_seed() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     return list(nodes.values()), list(edges.values())
 
 
+def _identity_name(name: Any) -> str:
+    normalized = "".join(str(name or "").lower().split())
+    aliases = {
+        "java后端工程师": "java开发工程师",
+        "java后端开发工程师": "java开发工程师",
+        "高级java开发工程师": "java开发工程师",
+    }
+    return aliases.get(normalized, normalized)
+
+
+def merge_graph_data(
+    existing_nodes: list[dict[str, Any]],
+    existing_edges: list[dict[str, Any]],
+    incoming_nodes: list[dict[str, Any]],
+    incoming_edges: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Idempotently merge a generated batch into the currently served graph."""
+    existing_nodes = [
+        node for node in existing_nodes
+        if not str(node.get("id", "")).startswith(("candidate_", "reverse_candidate_"))
+    ]
+    nodes_by_id = {(node.get("mode"), node.get("id")): dict(node) for node in existing_nodes}
+    identity_to_id = {
+        (node.get("mode"), node.get("type"), _identity_name(node.get("name"))): node.get("id")
+        for node in existing_nodes
+    }
+    id_remap: dict[tuple[Any, Any], Any] = {}
+
+    for node in incoming_nodes:
+        mode = node.get("mode")
+        incoming_id = node.get("id")
+        identity = (mode, node.get("type"), _identity_name(node.get("name")))
+        target_id = identity_to_id.get(identity, incoming_id)
+        id_remap[(mode, incoming_id)] = target_id
+        key = (mode, target_id)
+        if key in nodes_by_id:
+            current = nodes_by_id[key]
+            merged = {**current, **node, "id": target_id}
+            merged["firstSeen"] = min(filter(None, [current.get("firstSeen"), node.get("firstSeen")]), default="")
+            merged["sampleCount"] = max(int(current.get("sampleCount", 0)), int(node.get("sampleCount", 0)))
+            merged["dataKind"] = "mixed" if current.get("dataKind") == "demo" else node.get("dataKind", current.get("dataKind"))
+            nodes_by_id[key] = merged
+        else:
+            inserted = dict(node)
+            inserted["id"] = target_id
+            nodes_by_id[key] = inserted
+            identity_to_id[identity] = target_id
+
+    edges_by_key = {
+        (edge.get("mode"), edge.get("source"), edge.get("target"), edge.get("relationship")): dict(edge)
+        for edge in existing_edges
+    }
+    for edge in incoming_edges:
+        mode = edge.get("mode")
+        merged = dict(edge)
+        merged["source"] = id_remap.get((mode, edge.get("source")), edge.get("source"))
+        merged["target"] = id_remap.get((mode, edge.get("target")), edge.get("target"))
+        key = (mode, merged.get("source"), merged.get("target"), merged.get("relationship"))
+        edges_by_key[key] = {**edges_by_key.get(key, {}), **merged}
+
+    valid_ids = set(nodes_by_id)
+    valid_edges = [
+        edge for edge in edges_by_key.values()
+        if (edge.get("mode"), edge.get("source")) in valid_ids
+        and (edge.get("mode"), edge.get("target")) in valid_ids
+    ]
+    return list(nodes_by_id.values()), valid_edges
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build rule-based graph seed files from processed JD records.")
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed"))
+    parser.add_argument("--replace", action="store_true", help="Replace the existing graph instead of merging into it.")
     args = parser.parse_args()
 
-    nodes, edges = build_graph_seed()
-    write_jsonl(args.output_dir / "graph_nodes.jsonl", nodes)
-    write_jsonl(args.output_dir / "graph_edges.jsonl", edges)
-    print(f"wrote {len(nodes)} nodes and {len(edges)} edges")
+    incoming_nodes, incoming_edges = build_graph_seed()
+    node_path = args.output_dir / "graph_nodes.jsonl"
+    edge_path = args.output_dir / "graph_edges.jsonl"
+    if args.replace:
+        nodes, edges = incoming_nodes, incoming_edges
+        operation = "replaced"
+    else:
+        nodes, edges = merge_graph_data(read_jsonl(node_path), read_jsonl(edge_path), incoming_nodes, incoming_edges)
+        operation = "merged"
+    write_jsonl(node_path, nodes)
+    write_jsonl(edge_path, edges)
+    print(f"{operation} graph: {len(nodes)} nodes and {len(edges)} edges ({len(incoming_nodes)} incoming nodes)")
 
 
 if __name__ == "__main__":

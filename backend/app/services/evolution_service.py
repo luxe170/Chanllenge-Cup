@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from collections import defaultdict
 from datetime import datetime
@@ -72,6 +73,17 @@ POSITION_ALIASES = {
         "ai coding",
         "前端开发",
     ],
+}
+
+# Position identity is determined from the title, not from skills mentioned in
+# the JD body. Otherwise a new role mentioning Python/LLM would be incorrectly
+# folded into an existing AI position before novelty detection can run.
+POSITION_TITLE_ALIASES = {
+    "pos_ai_agent_engineer": ["ai agent", "agent研发", "agent工程师", "智能体研发", "智能体工程师"],
+    "pos_llm_engineer": ["大模型应用工程师", "大模型工程师", "llm工程师", "生成式ai工程师"],
+    "pos_java_engineer": ["java开发", "java后端", "java工程师"],
+    "pos_data_analyst": ["数据分析师", "数据分析工程师"],
+    "pos_frontend_engineer": ["前端开发", "前端研发", "前端工程师"],
 }
 
 SKILL_ALIASES = {
@@ -154,22 +166,36 @@ def _match_aliases(text: str, aliases: Iterable[str]) -> bool:
 
 
 def _position_for_record(record: Dict[str, Any]) -> str:
-    text = " ".join(
-        [
-            record.get("title", ""),
-            record.get("description", ""),
-            record.get("requirement", ""),
-            record.get("category", ""),
-        ]
-    )
-    best_position = "pos_ai_agent_engineer"
-    best_score = -1
-    for position_id, aliases in POSITION_ALIASES.items():
-        score = sum(1 for alias in aliases if alias.lower() in text.lower())
+    title = _normalize_text(record.get("title", ""))
+    best_position = ""
+    best_score = 0
+    for position_id, aliases in POSITION_TITLE_ALIASES.items():
+        score = sum(1 for alias in aliases if alias.lower().replace(" ", "") in title.replace(" ", ""))
         if score > best_score:
             best_score = score
             best_position = position_id
-    return best_position
+    if best_position:
+        return best_position
+
+    # Unknown titles must not be silently folded into AI Agent. They remain
+    # candidates until the emerging-position review accepts them.
+    normalized_title = _normalize_position_title(record.get("title", ""))
+    digest = hashlib.sha1(normalized_title.encode("utf-8")).hexdigest()[:10]
+    return f"candidate_{digest}"
+
+
+def _normalize_position_title(value: Any) -> str:
+    """Normalize superficial title variants without inventing a standard job."""
+    title = _normalize_text(value)
+    title = re.sub(r"[（(][^）)]*(?:校招|社招|急招|招聘|外包)[^）)]*[）)]", "", title)
+    title = re.sub(r"(?:高级|资深|初级|中级|实习|专家|负责人|校招|社招|急招)", "", title)
+    title = re.sub(r"[-_/·|｜\s]+", "", title)
+    return title or "未命名岗位"
+
+
+def _display_candidate_title(records: List[Dict[str, Any]]) -> str:
+    titles = [str(record.get("title", "")).strip() for record in records if record.get("title")]
+    return max(set(titles), key=titles.count) if titles else "未命名岗位"
 
 
 def _load_job_records() -> List[Dict[str, Any]]:
@@ -304,6 +330,11 @@ def compute_evolution_changes(page: int = 1, page_size: int = 20, keyword: str =
         return {"items": [], "total": 0, "page": page, "pageSize": page_size}
 
     for position_id in sorted(all_position_ids):
+        # Unrecognized titles first go through new-position review. Until they
+        # are accepted into the standard position library, they do not also
+        # produce misleading "existing position capability change" events.
+        if position_id.startswith("candidate_"):
+            continue
         previous = historical_snapshot.get(position_id, {})
         current = current_snapshot.get(position_id, {})
         all_skill_ids = set(previous) | set(current)
@@ -458,7 +489,6 @@ def compute_emerging_positions(page: int = 1, page_size: int = 20, keyword: str 
     if not records:
         return {"items": [], "total": 0, "page": page, "pageSize": page_size}
 
-    historical_snapshot, current_snapshot, _ = _build_real_snapshot_data()
     position_counts: Dict[str, Dict[str, Any]] = defaultdict(dict)
     for record in records:
         position_id = record["_position_id"]
@@ -467,36 +497,58 @@ def compute_emerging_positions(page: int = 1, page_size: int = 20, keyword: str 
 
     candidates: List[Dict[str, Any]] = []
     for position_id, record_list in sorted(position_counts.items()):
-        current_count = len(record_list["jobs"])
-        if current_count < 3:
+        # Known standard positions are existing positions even when their
+        # recruitment volume grows sharply. Their changes belong to the
+        # capability-evolution pipeline instead.
+        if not position_id.startswith("candidate_"):
             continue
+
+        jobs = record_list["jobs"]
+        sample_count = len(jobs)
+        source_count = len({company for company in record_list["companies"] if company})
+        if sample_count < 3 or source_count < 2:
+            continue
+
         cutoff = datetime(2025, 1, 1, tzinfo=None)
-        history_count = len(
-            [
-                record
-                for record in records
-                if record["_position_id"] == position_id and record["_parsed_time"].replace(tzinfo=None) < cutoff
-            ]
-        )
-        growth_rate = round((current_count / max(1, history_count)) - 1, 2) if history_count else 0.8
-        if growth_rate <= 0.1:
+        historical_jobs = [record for record in jobs if record["_parsed_time"].replace(tzinfo=None) < cutoff]
+        recent_jobs = [record for record in jobs if record["_parsed_time"].replace(tzinfo=None) >= cutoff]
+        # A title seen before the baseline is not a newly discovered position.
+        if historical_jobs or len(recent_jobs) < 3:
             continue
-        skill_ids = sorted((current_snapshot.get(position_id, {}) or {}).keys())[:3]
-        if not skill_ids:
-            skill_ids = sorted((historical_snapshot.get(position_id, {}) or {}).keys())[:3]
+
+        skill_ids = []
+        for skill_id, aliases in SKILL_ALIASES.items():
+            hit_count = sum(_match_aliases(_record_text(record), aliases) for record in recent_jobs)
+            if hit_count / len(recent_jobs) >= 0.34:
+                skill_ids.append(skill_id)
+        skill_ids = skill_ids[:5]
+        # Require a coherent skill combination, not merely a novel spelling of
+        # an otherwise unsupported title.
+        if len(skill_ids) < 2:
+            continue
+
         skill_items = [{"id": skill_id, "name": SKILL_NAME_MAP.get(skill_id, skill_id)} for skill_id in skill_ids]
-        confidence = min(0.99, 0.55 + growth_rate * 0.35)
+        first_seen = min(record["_parsed_time"] for record in recent_jobs)
+        last_seen = max(record["_parsed_time"] for record in recent_jobs)
+        span_days = max(0, (last_seen - first_seen).days)
+        continuity = min(1.0, span_days / 60.0)
+        source_score = min(1.0, source_count / 4.0)
+        sample_score = min(1.0, sample_count / 10.0)
+        skill_score = min(1.0, len(skill_ids) / 4.0)
+        confidence = round(0.3 * source_score + 0.25 * sample_score + 0.2 * continuity + 0.25 * skill_score, 2)
+        growth_rate = round(len(recent_jobs) / 3.0, 2)
+        display_name = _display_candidate_title(recent_jobs)
         candidates.append(
             {
                 "id": f"emerging_{len(candidates) + 1:03d}",
                 "positionId": position_id,
-                "name": POSITION_NAME_MAP.get(position_id, position_id),
-                "description": "基于持续增长的岗位需求与技能组合，识别出具备上升趋势的岗位类型。",
-                "growthRate": round(max(0.1, growth_rate), 2),
-                "confidence": round(confidence, 2),
-                "firstSeen": min(record["publish_time"] for record in record_list["jobs"] if record.get("publish_time"))[:10],
-                "sourceCount": len(record_list["companies"]),
-                "sampleCount": current_count,
+                "name": display_name,
+                "description": f"未匹配既有岗位库；由 {source_count} 家企业的 {sample_count} 条近期 JD 支撑，并形成稳定技能组合。",
+                "growthRate": growth_rate,
+                "confidence": confidence,
+                "firstSeen": first_seen.date().isoformat(),
+                "sourceCount": source_count,
+                "sampleCount": sample_count,
                 "skills": skill_items,
             }
         )

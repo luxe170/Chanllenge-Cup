@@ -3,7 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
-from src.processing.build_graph_seed import build_graph_seed
+from src.processing.build_graph_seed import build_graph_seed, merge_graph_data
 from src.processing.build_review_candidates import build_review_candidates
 
 
@@ -35,6 +35,27 @@ class DataLlmBoundaryTest(unittest.TestCase):
         self.assertGreater(len(items), 0)
         self.assertTrue(any(item["type"] == "能力变更" and item.get("targetId") for item in items))
         self.assertTrue(any(item["type"] == "新岗位" and item.get("targetId") for item in items))
+
+    def test_graph_batch_merges_by_identity_without_duplicate_position(self) -> None:
+        existing_nodes = [
+            {"mode": "panorama", "id": "demo_pos_java", "name": "Java 后端工程师", "type": "position", "sampleCount": 50},
+            {"mode": "panorama", "id": "demo_skill_java", "name": "Java", "type": "skill"},
+        ]
+        existing_edges = [
+            {"mode": "panorama", "source": "demo_pos_java", "target": "demo_skill_java", "relationship": "REQUIRES"}
+        ]
+        incoming_nodes = [
+            {"mode": "panorama", "id": "pos_java_engineer", "name": "Java 开发工程师", "type": "position", "sampleCount": 8},
+            {"mode": "panorama", "id": "skill_cloud", "name": "云原生", "type": "skill"},
+        ]
+        incoming_edges = [
+            {"mode": "panorama", "source": "pos_java_engineer", "target": "skill_cloud", "relationship": "REQUIRES"}
+        ]
+
+        nodes, edges = merge_graph_data(existing_nodes, existing_edges, incoming_nodes, incoming_edges)
+
+        self.assertEqual(sum(node["type"] == "position" for node in nodes), 1)
+        self.assertTrue(any(edge["source"] == "demo_pos_java" and edge["target"] == "skill_cloud" for edge in edges))
 
 
 if __name__ == "__main__":
