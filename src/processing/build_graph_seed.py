@@ -20,9 +20,18 @@ from backend.app.services.evolution_service import (
 POSITION_CLUSTER_MAP = {
     "pos_ai_agent_engineer": ("position_cluster_ai", "人工智能研发岗位簇"),
     "pos_llm_engineer": ("position_cluster_ai", "人工智能研发岗位簇"),
+    "pos_algorithm_engineer": ("position_cluster_ai", "人工智能研发岗位簇"),
     "pos_java_engineer": ("position_cluster_software", "软件研发岗位簇"),
+    "pos_backend_engineer": ("position_cluster_software", "软件研发岗位簇"),
     "pos_frontend_engineer": ("position_cluster_software", "软件研发岗位簇"),
+    "pos_test_engineer": ("position_cluster_software", "软件研发岗位簇"),
     "pos_data_analyst": ("position_cluster_data", "数据技术岗位簇"),
+    "pos_data_engineer": ("position_cluster_data", "数据技术岗位簇"),
+    "pos_cloud_infra_engineer": ("position_cluster_cloud", "云计算与基础设施岗位簇"),
+    "pos_security_engineer": ("position_cluster_cloud", "云计算与基础设施岗位簇"),
+    "pos_storage_database_engineer": ("position_cluster_cloud", "云计算与基础设施岗位簇"),
+    "pos_hardware_engineer": ("position_cluster_hardware", "硬件与智能系统岗位簇"),
+    "pos_game_engineer": ("position_cluster_game", "游戏与图形技术岗位簇"),
 }
 
 SKILL_CLUSTER_MAP = {
@@ -32,13 +41,23 @@ SKILL_CLUSTER_MAP = {
     "skill_multi_agent": ("skill_cluster_llm_app", "大模型应用开发技能簇"),
     "skill_rag_eval": ("skill_cluster_knowledge", "知识检索与工程技能簇"),
     "skill_python": ("skill_cluster_engineering", "工程实现技能簇"),
+    "skill_go": ("skill_cluster_engineering", "工程实现技能簇"),
+    "skill_cpp": ("skill_cluster_engineering", "工程实现技能簇"),
     "skill_java": ("skill_cluster_engineering", "工程实现技能簇"),
     "skill_spring": ("skill_cluster_engineering", "工程实现技能簇"),
     "skill_cloud_native": ("skill_cluster_engineering", "工程实现技能簇"),
+    "skill_distributed": ("skill_cluster_engineering", "工程实现技能簇"),
     "skill_frontend": ("skill_cluster_engineering", "工程实现技能簇"),
     "skill_ai_codegen": ("skill_cluster_engineering", "工程实现技能簇"),
+    "skill_algorithm": ("skill_cluster_algorithm", "算法与机器学习技能簇"),
+    "skill_nlp": ("skill_cluster_algorithm", "算法与机器学习技能簇"),
+    "skill_multimodal": ("skill_cluster_algorithm", "算法与机器学习技能簇"),
+    "skill_testing": ("skill_cluster_quality", "质量与测试技能簇"),
+    "skill_security": ("skill_cluster_security", "安全与风控技能簇"),
+    "skill_database": ("skill_cluster_data", "数据分析与处理技能簇"),
     "skill_sql": ("skill_cluster_data", "数据分析与处理技能簇"),
     "skill_excel": ("skill_cluster_data", "数据分析与处理技能簇"),
+    "skill_hardware": ("skill_cluster_hardware", "硬件与系统技能簇"),
 }
 
 
@@ -47,8 +66,8 @@ def _first_seen(records: list[dict[str, Any]]) -> str:
     return min(values) if values else ""
 
 
-def build_graph_seed() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    records = _load_job_records()
+def build_graph_seed(input_path: Path | str | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    records = _load_job_records(input_path)
     by_position: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for record in records:
         by_position[record["_position_id"]].append(record)
@@ -215,11 +234,12 @@ def merge_graph_data(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build rule-based graph seed files from processed JD records.")
+    parser.add_argument("--input", type=Path, default=None, help="JSONL JD records used to build graph seed files.")
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--replace", action="store_true", help="Replace the existing graph instead of merging into it.")
     args = parser.parse_args()
 
-    incoming_nodes, incoming_edges = build_graph_seed()
+    incoming_nodes, incoming_edges = build_graph_seed(args.input)
     node_path = args.output_dir / "graph_nodes.jsonl"
     edge_path = args.output_dir / "graph_edges.jsonl"
     if args.replace:

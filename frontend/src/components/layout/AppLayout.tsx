@@ -13,9 +13,10 @@ import {
   Sparkles,
   UserRoundSearch,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AppLink, useAppRouter } from '../../router'
+import { api } from '../../services/api'
 
 const navigation = [
   { to: '/dashboard', label: '全局工作台', icon: LayoutDashboard },
@@ -38,8 +39,15 @@ const pageTitles: Record<string, { eyebrow: string; title: string }> = {
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [pendingReviewCount, setPendingReviewCount] = useState(0)
   const { path } = useAppRouter()
   const current = pageTitles[path] ?? pageTitles['/dashboard']
+
+  useEffect(() => {
+    api.getEvaluationSummary()
+      .then((res) => setPendingReviewCount(res.data.pendingReviewCount))
+      .catch(() => setPendingReviewCount(0))
+  }, [])
 
   return (
     <div className={`app-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
@@ -56,7 +64,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <AppLink key={to} to={to} onClick={() => setMobileOpen(false)} className={path === to ? 'nav-item active' : 'nav-item'}>
               <Icon size={19} strokeWidth={1.8} />
               <span>{label}</span>
-              {to === '/review' && <em>28</em>}
+              {to === '/review' && pendingReviewCount > 0 && <em>{pendingReviewCount}</em>}
             </AppLink>
           ))}
         </nav>

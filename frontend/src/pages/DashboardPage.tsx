@@ -27,11 +27,15 @@ export default function DashboardPage() {
       .finally(() => setUploading(false))
   }
 
+  const dataSplitLabel = summary.graphTrainCount && summary.jdTestCount
+    ? `${summary.sourceCount} 原始 · ${summary.graphTrainCount} 建图 · ${summary.jdTestCount} 测试`
+    : `${summary.sourceCount} 原始样本`
+
   return (
     <div className="page-stack dashboard-page">
       <section className="welcome-banner">
         <div className="welcome-content">
-          <span className="live-chip"><i /> 数据已同步至 2026-07-29</span>
+          <span className="live-chip"><i /> 后端数据实时同步</span>
           <h2>看见岗位变化，找到能力方向</h2>
           <p>多源异构数据驱动的岗位能力图谱动态构建与演化分析系统</p>
           <div className="welcome-actions">
@@ -49,9 +53,9 @@ export default function DashboardPage() {
       </section>
 
       <section className="metric-grid">
-        <MetricCard icon={Database} label="有效岗位样本" value={summary.validCount} change="+12.4%" tone="cyan" />
-        <MetricCard icon={BriefcaseBusiness} label="新兴岗位" value={summary.emergingCount} change="+3" tone="violet" />
-        <MetricCard icon={TrendingUp} label="能力变更" value={summary.changedCount} change="+8.6%" tone="green" />
+        <MetricCard icon={Database} label="有效岗位样本" value={summary.validCount} change={dataSplitLabel} tone="cyan" />
+        <MetricCard icon={BriefcaseBusiness} label="新兴岗位" value={summary.emergingCount} change={summary.emergingCount ? '规则发现' : '暂无新增'} tone="violet" />
+        <MetricCard icon={TrendingUp} label="能力变更" value={summary.changedCount} change={`${summary.changedCount} 项变更`} tone="green" />
       </section>
 
       <section className="panel batch-panel">

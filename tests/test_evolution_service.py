@@ -79,6 +79,19 @@ class EvolutionServiceTest(unittest.TestCase):
         )
         self.assertTrue(position_id.startswith("candidate_"))
 
+    def test_common_technical_titles_are_normalized_to_standard_positions(self):
+        cases = {
+            "推荐算法工程师-国际电商": "pos_algorithm_engineer",
+            "后端研发工程师": "pos_backend_engineer",
+            "测试开发工程师": "pos_test_engineer",
+            "云计算 SRE 工程师": "pos_cloud_infra_engineer",
+            "硬件芯片工程师": "pos_hardware_engineer",
+        }
+
+        for title, expected in cases.items():
+            with self.subTest(title=title):
+                self.assertEqual(_position_for_record({"title": title}), expected)
+
 
 if __name__ == "__main__":
     unittest.main()
