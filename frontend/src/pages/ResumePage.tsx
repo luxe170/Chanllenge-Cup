@@ -1,39 +1,34 @@
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, FileCheck2, FileText, GraduationCap, LoaderCircle, PenLine, RotateCcw, ShieldCheck, Sparkles, UploadCloud, WandSparkles, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Confidence, SectionHeader } from '../components/common'
-import { resumeSkills } from '../data/mock'
 import { AppLink } from '../router'
 import { api } from '../services/api'
 import type { ParsedResumeProfile } from '../types'
 
-const fallbackProfile: ParsedResumeProfile = {
-  candidateName: '陈小雨',
-  targetPosition: 'AI Agent 研发工程师',
-  education: '硕士 · 计算机科学',
-  experienceYears: 3,
-  direction: '算法与 AI 应用方向',
-  completeness: 94,
-  skills: resumeSkills,
-  experiences: [
-    { period: '2025.03 — 至今', title: '企业知识库智能问答系统', description: '负责 RAG 链路、向量检索与模型服务化，离线评测准确率提升 18%。', skills: ['RAG', 'LangChain', 'FastAPI'] },
-    { period: '2024.06 — 2025.01', title: '多轮对话助手', description: '参与提示词工程、会话状态管理及工具调用模块开发。', skills: ['大语言模型', 'Python'] },
-  ],
-}
-
 export default function ResumePage() {
-  const [fileName, setFileName] = useState('陈小雨_AI产品研发_简历.pdf')
+  const [fileName, setFileName] = useState('')
   const [parsing, setParsing] = useState(false)
-  const [parsed, setParsed] = useState(true)
-  const [profile, setProfile] = useState<ParsedResumeProfile>(fallbackProfile)
-  const [taskId, setTaskId] = useState('demo_resume_task')
+  const [parsed, setParsed] = useState(false)
+  const [profile, setProfile] = useState<ParsedResumeProfile | null>(null)
+  const [taskId, setTaskId] = useState('')
   const [parseError, setParseError] = useState('')
   const [resumeMetric, setResumeMetric] = useState({ value: 92.4, sampleCount: 108 })
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    api.getResumeTask('demo_resume_task')
-      .then((res) => res.data.result && setProfile(res.data.result))
-      .catch(() => setProfile(fallbackProfile))
+    const savedTaskId = window.sessionStorage.getItem('latestResumeTaskId')
+    if (savedTaskId === 'demo_resume_task') {
+      window.sessionStorage.removeItem('latestResumeTaskId')
+    } else if (savedTaskId) {
+      api.getResumeTask(savedTaskId)
+        .then((res) => {
+          if (!res.data.result) return
+          setTaskId(savedTaskId)
+          setProfile(res.data.result)
+          setParsed(true)
+        })
+        .catch(() => window.sessionStorage.removeItem('latestResumeTaskId'))
+    }
     api.getEvaluationSummary()
       .then((res) => {
         const metric = res.data.metrics.find((item) => item.name === '简历提取准确率')
@@ -65,9 +60,10 @@ export default function ResumePage() {
   }
 
   const updateSkills = () => {
+    if (!taskId || !profile) return
     api.updateResumeSkills(taskId, profile.skills)
-      .then((res) => setProfile((current) => ({ ...current, skills: res.data.skills })))
-      .catch(() => setProfile((current) => ({ ...current })))
+      .then((res) => setProfile((current) => current ? ({ ...current, skills: res.data.skills }) : current))
+      .catch(() => undefined)
   }
 
   return (
@@ -90,7 +86,7 @@ export default function ResumePage() {
           <div className="parser-metric"><WandSparkles size={18} /><div><strong>{resumeMetric.value}% 简历提取准确率</strong><span>基于 {resumeMetric.sampleCount} 份人工标注简历验证</span></div></div>
         </aside>
 
-        <section className={`panel resume-result ${parsed ? 'visible' : ''}`}>
+        {parsed && profile ? <section className="panel resume-result visible">
           <div className="result-header"><div><span className="section-eyebrow">PARSED PROFILE</span><h2>{profile.candidateName}的能力画像</h2><p>{profile.direction} · {profile.experienceYears} 年项目经验</p></div><span className="parse-score"><small>解析完整度</small><strong>{profile.completeness}<em>%</em></strong></span></div>
           <div className="profile-summary">
             <div><span className="profile-avatar">{profile.candidateName.slice(0, 1)}</span><div><strong>{profile.candidateName}</strong><span>意向：{profile.targetPosition}</span></div></div>
@@ -116,7 +112,12 @@ export default function ResumePage() {
           </div>
 
           <div className="result-footer"><span><FileCheck2 size={17} />已完成技能标准化与歧义消解</span><AppLink to="/match" className="primary-button">进入匹配诊断<ArrowRight size={16} /></AppLink></div>
-        </section>
+        </section> : <section className="panel resume-result visible resume-empty-state">
+          <span className="upload-icon"><FileText size={30} /></span>
+          <h2>尚未生成能力画像</h2>
+          <p>请先上传一份真实简历。解析完成后，这里将展示从简历中提取的技能与经历。</p>
+          <button className="primary-button" onClick={() => inputRef.current?.click()}><UploadCloud size={16} />选择简历文件</button>
+        </section>}
       </section>
     </div>
   )

@@ -7,6 +7,7 @@ import type { GraphEdge, GraphNode } from '../../types'
 interface Graph3DProps {
   nodes: GraphNode[]
   edges: GraphEdge[]
+  hierarchy: GraphNode['type'][]
   selectedNodeId: string
   scale: number
   resetSignal: number
@@ -33,11 +34,9 @@ const nodeRadius: Record<GraphNode['type'], number> = {
 
 type WorldPosition = [number, number, number]
 
-const createAutoLayout = (nodes: GraphNode[]) => {
-  const hasStackLayer = nodes.some((node) => node.type === 'stack')
-  const layerOrder: GraphNode['type'][] = hasStackLayer
-    ? ['stack', 'cluster', 'skill', 'position']
-    : ['cluster', 'position', 'skill']
+const createAutoLayout = (nodes: GraphNode[], hierarchy: GraphNode['type'][]) => {
+  const presentTypes = new Set(nodes.map((node) => node.type))
+  const layerOrder = hierarchy.filter((type) => presentTypes.has(type))
   const positions = new Map<string, WorldPosition>()
   const layerGap = 2.45
   const topY = ((layerOrder.length - 1) * layerGap) / 2
@@ -118,7 +117,7 @@ function StarField() {
   )
 }
 
-function NodeMesh({ node, position, selected, onSelect }: { node: GraphNode; position: WorldPosition; selected: boolean; onSelect: () => void }) {
+function NodeMesh({ node, position, selected, highlighted, onSelect }: { node: GraphNode; position: WorldPosition; selected: boolean; highlighted: boolean; onSelect: () => void }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
@@ -150,13 +149,15 @@ function NodeMesh({ node, position, selected, onSelect }: { node: GraphNode; pos
           color={colors[node.type]}
           emissive={colors[node.type]}
           emissiveIntensity={selected ? .72 : hovered ? .5 : .25}
+          transparent
+          opacity={highlighted ? 1 : .42}
           metalness={.14}
           roughness={.3}
         />
       </mesh>
       <mesh ref={glowRef} scale={selected ? 1.45 : 1.28}>
         <sphereGeometry args={[radius, 24, 24]} />
-        <meshBasicMaterial color={colors[node.type]} transparent opacity={selected ? .12 : .055} side={THREE.BackSide} blending={THREE.AdditiveBlending} />
+        <meshBasicMaterial color={colors[node.type]} transparent opacity={highlighted ? (selected ? .12 : .055) : .025} side={THREE.BackSide} blending={THREE.AdditiveBlending} />
       </mesh>
       {node.trend === 'new' && (
         <mesh position={[radius * .78, radius * .78, radius * .7]}>
@@ -168,7 +169,7 @@ function NodeMesh({ node, position, selected, onSelect }: { node: GraphNode; pos
   )
 }
 
-function EdgeLine({ sourcePosition, targetPosition, relationship }: { sourcePosition: WorldPosition; targetPosition: WorldPosition; relationship: GraphEdge['relationship'] }) {
+function EdgeLine({ sourcePosition, targetPosition, relationship, highlighted }: { sourcePosition: WorldPosition; targetPosition: WorldPosition; relationship: GraphEdge['relationship']; highlighted: boolean }) {
   const line = useMemo(() => {
     const geometry = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(...sourcePosition),
@@ -177,11 +178,11 @@ function EdgeLine({ sourcePosition, targetPosition, relationship }: { sourcePosi
     const material = new THREE.LineBasicMaterial({
       color: relationship === 'BELONGS_TO' ? '#57d8aa' : '#6dbcd8',
       transparent: true,
-      opacity: relationship === 'BELONGS_TO' ? .34 : .26,
+      opacity: highlighted ? .92 : .12,
       blending: THREE.AdditiveBlending,
     })
     return new THREE.Line(geometry, material)
-  }, [relationship, sourcePosition, targetPosition])
+  }, [highlighted, relationship, sourcePosition, targetPosition])
 
   useEffect(() => () => {
     line.geometry.dispose()
@@ -192,7 +193,7 @@ function EdgeLine({ sourcePosition, targetPosition, relationship }: { sourcePosi
   return <primitive object={line} />
 }
 
-function ProjectLabels({ nodes, positions, groupRef, labelRefs }: { nodes: GraphNode[]; positions: Map<string, WorldPosition>; groupRef: React.RefObject<THREE.Group | null>; labelRefs: SceneProps['labelRefs'] }) {
+function ProjectLabels({ nodes, positions, highlightedIds, groupRef, labelRefs }: { nodes: GraphNode[]; positions: Map<string, WorldPosition>; highlightedIds: Set<string>; groupRef: React.RefObject<THREE.Group | null>; labelRefs: SceneProps['labelRefs'] }) {
   const vector = useMemo(() => new THREE.Vector3(), [])
   const worldPosition = useMemo(() => new THREE.Vector3(), [])
 
@@ -208,7 +209,7 @@ function ProjectLabels({ nodes, positions, groupRef, labelRefs }: { nodes: Graph
       worldPosition.set(...position).applyMatrix4(group.matrixWorld)
       vector.copy(worldPosition).project(camera)
       const visible = vector.z > -1 && vector.z < 1
-      element.style.opacity = visible ? '1' : '0'
+      element.style.opacity = visible ? (highlightedIds.has(node.id) ? '1' : '.46') : '0'
       element.style.transform = `translate(-50%, -50%) translate(${(vector.x * .5 + .5) * size.width}px, ${(-vector.y * .5 + .5) * size.height}px)`
       element.style.zIndex = String(Math.max(1, Math.round((1 - vector.z) * 50)))
     })
@@ -217,10 +218,18 @@ function ProjectLabels({ nodes, positions, groupRef, labelRefs }: { nodes: Graph
   return null
 }
 
-function GraphScene({ nodes, edges, selectedNodeId, scale, resetSignal, onSelectNode, labelRefs }: SceneProps) {
+function GraphScene({ nodes, edges, hierarchy, selectedNodeId, scale, resetSignal, onSelectNode, labelRefs }: SceneProps) {
   const groupRef = useRef<THREE.Group>(null)
   const nodeMap = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes])
-  const positions = useMemo(() => createAutoLayout(nodes), [nodes])
+  const positions = useMemo(() => createAutoLayout(nodes, hierarchy), [nodes, hierarchy])
+  const highlightedIds = useMemo(() => {
+    const ids = new Set<string>([selectedNodeId])
+    edges.forEach((edge) => {
+      if (edge.source === selectedNodeId) ids.add(edge.target)
+      if (edge.target === selectedNodeId) ids.add(edge.source)
+    })
+    return ids
+  }, [edges, selectedNodeId])
 
   return (
     <>
@@ -235,17 +244,18 @@ function GraphScene({ nodes, edges, selectedNodeId, scale, resetSignal, onSelect
           const target = nodeMap.get(edge.target)
           const sourcePosition = positions.get(edge.source)
           const targetPosition = positions.get(edge.target)
-          return source && target && sourcePosition && targetPosition ? <EdgeLine key={`${edge.source}-${edge.target}-${index}`} sourcePosition={sourcePosition} targetPosition={targetPosition} relationship={edge.relationship} /> : null
+          const highlighted = edge.source === selectedNodeId || edge.target === selectedNodeId
+          return source && target && sourcePosition && targetPosition ? <EdgeLine key={`${edge.source}-${edge.target}-${index}`} sourcePosition={sourcePosition} targetPosition={targetPosition} relationship={edge.relationship} highlighted={highlighted} /> : null
         })}
-        {nodes.map((node) => <NodeMesh key={node.id} node={node} position={positions.get(node.id) ?? [0, 0, 0]} selected={node.id === selectedNodeId} onSelect={() => onSelectNode(node)} />)}
+        {nodes.map((node) => <NodeMesh key={node.id} node={node} position={positions.get(node.id) ?? [0, 0, 0]} selected={node.id === selectedNodeId} highlighted={highlightedIds.has(node.id)} onSelect={() => onSelectNode(node)} />)}
       </group>
-      <ProjectLabels nodes={nodes} positions={positions} groupRef={groupRef} labelRefs={labelRefs} />
+      <ProjectLabels nodes={nodes} positions={positions} highlightedIds={highlightedIds} groupRef={groupRef} labelRefs={labelRefs} />
       <CameraControls resetSignal={resetSignal} />
     </>
   )
 }
 
-export default function Graph3D({ nodes, edges, selectedNodeId, scale, resetSignal, onSelectNode }: Graph3DProps) {
+export default function Graph3D({ nodes, edges, hierarchy, selectedNodeId, scale, resetSignal, onSelectNode }: Graph3DProps) {
   const labelRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   return (
@@ -263,6 +273,7 @@ export default function Graph3D({ nodes, edges, selectedNodeId, scale, resetSign
         <GraphScene
           nodes={nodes}
           edges={edges}
+          hierarchy={hierarchy}
           selectedNodeId={selectedNodeId}
           scale={scale}
           resetSignal={resetSignal}

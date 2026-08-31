@@ -325,6 +325,25 @@ export interface MatchReport {
   learningPath: LearningStep[]
 }
 
+export interface MatchRankingItem {
+  positionId: string
+  positionName: string
+  score: number
+  fitLevel: string
+  matchedSkillCount: number
+  totalSkillCount: number
+  strengths: string[]
+  gapCount: number
+}
+
+export interface MatchRanking {
+  resumeTaskId: string
+  bestPositionId: string
+  bestPositionName: string
+  bestScore: number
+  items: MatchRankingItem[]
+}
+
 export interface ReviewItem {
   id: string
   type: '新岗位' | '能力变更' | '技能归一'

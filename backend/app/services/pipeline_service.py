@@ -257,10 +257,9 @@ def _apply_payload(review_type: str, target_id: str, payload: dict[str, Any]) ->
             {"mode": "panorama", "id": position_id, "name": name, "type": "position", "trend": "new", "sampleCount": payload["sampleCount"], "confidence": 0.9, "generatedAt": generated_at},
             {"mode": "panorama", "id": "approved_cluster_emerging", "name": "新兴技术岗位簇", "type": "cluster", "generatedAt": generated_at},
             {"mode": "skill_reverse", "id": f"reverse_{position_id}", "name": name, "type": "position", "trend": "new", "sampleCount": payload["sampleCount"], "confidence": 0.9, "generatedAt": generated_at},
-            {"mode": "skill_reverse", "id": "approved_stack_emerging", "name": "新兴技术栈", "type": "stack", "generatedAt": generated_at},
             {"mode": "skill_reverse", "id": "approved_skill_cluster_emerging", "name": "新兴岗位核心技能簇", "type": "cluster", "generatedAt": generated_at},
         ]
-        edges += [{"mode": "panorama", "source": position_id, "target": "approved_cluster_emerging", "relationship": "BELONGS_TO"}, {"mode": "skill_reverse", "source": "approved_skill_cluster_emerging", "target": "approved_stack_emerging", "relationship": "BELONGS_TO"}]
+        edges += [{"mode": "panorama", "source": position_id, "target": "approved_cluster_emerging", "relationship": "BELONGS_TO"}]
         skills = payload["skills"]
     else:
         name = payload["positionName"]
@@ -271,10 +270,8 @@ def _apply_payload(review_type: str, target_id: str, payload: dict[str, Any]) ->
         reverse_matched = next((node for node in reverse_positions if _normalize_position_title(node.get("name")) == _normalize_position_title(name)), None)
         reverse_position_id = reverse_matched["id"] if reverse_matched else f"reverse_{position_id}"
         nodes += [
-            {"mode": "skill_reverse", "id": "approved_stack_emerging", "name": "新兴技术栈", "type": "stack", "generatedAt": generated_at},
             {"mode": "skill_reverse", "id": "approved_skill_cluster_emerging", "name": "新兴岗位核心技能簇", "type": "cluster", "generatedAt": generated_at},
         ]
-        edges.append({"mode": "skill_reverse", "source": "approved_skill_cluster_emerging", "target": "approved_stack_emerging", "relationship": "BELONGS_TO"})
         skills = payload["addedSkills"]
 
     for skill in skills:

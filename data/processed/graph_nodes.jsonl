@@ -1,7 +1,6 @@
 {"mode": "panorama", "id": "position_cluster_software", "name": "软件研发岗位簇", "type": "cluster", "sampleCount": 51, "confidence": 0.88, "generatedAt": "2026-08-31T10:39:12Z"}
 {"mode": "panorama", "id": "pos_backend_engineer", "name": "后端研发工程师", "type": "position", "trend": "stable", "sampleCount": 23, "firstSeen": "2018-07-19", "confidence": 0.85, "generatedAt": "2026-08-31T10:39:12Z"}
 {"mode": "panorama", "id": "skill_llm", "name": "大语言模型", "type": "skill", "trend": "stable", "weight": 1.0, "sampleCount": 1, "firstSeen": "2026-02-26", "confidence": 0.95, "generatedAt": "2026-08-31T10:39:12Z"}
-{"mode": "skill_reverse", "id": "reverse_stack_next_it", "name": "新一代信息技术栈", "type": "stack", "sampleCount": 200, "confidence": 0.9, "generatedAt": "2026-08-31T10:39:12Z"}
 {"mode": "skill_reverse", "id": "reverse_skill_cluster_llm_app", "name": "大模型应用开发技能簇", "type": "cluster", "sampleCount": 89, "confidence": 0.88, "generatedAt": "2026-08-31T10:39:12Z"}
 {"mode": "skill_reverse", "id": "reverse_skill_llm", "name": "大语言模型", "type": "skill", "trend": "stable", "weight": 1.0, "sampleCount": 1, "confidence": 0.95, "generatedAt": "2026-08-31T10:39:12Z"}
 {"mode": "skill_reverse", "id": "reverse_pos_backend_engineer", "name": "后端研发工程师", "type": "position", "trend": "stable", "weight": 0.09, "sampleCount": 23, "confidence": 0.85, "generatedAt": "2026-08-31T10:39:12Z"}
