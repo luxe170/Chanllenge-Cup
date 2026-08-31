@@ -258,6 +258,7 @@ input::placeholder, textarea::placeholder { color: #60758d; }
 .requirement-list > div > span:nth-child(2) { color: #73899d; font-size: 9px; text-align: right; }
 .requirement-list .confidence strong { font-size: 9px; }
 .requirement-list .confidence-track { height: 4px; }
+.warn-chip { width: fit-content; padding: 4px 6px; display: flex; align-items: center; gap: 4px; border-radius: 6px; color: var(--amber); background: var(--amber-soft); }
 
 @media (max-width: 680px) {
   .modal-backdrop { padding: 12px; }

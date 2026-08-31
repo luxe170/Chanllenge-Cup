@@ -41,10 +41,17 @@ def build_review_candidates() -> list[dict]:
             }
         )
 
+    generated_types = {item["type"] for item in items}
+    fallback_target_ids = {
+        "新岗位": "candidate_demo_emerging_position",
+        "能力变更": "change_demo_context_engineering",
+        "技能归一": "skill_multi_agent",
+    }
     for item in fresh(REVIEW_ITEMS):
-        if item["type"] == "技能归一":
-            item["targetId"] = item.get("targetId", "skill_multi_agent")
-            items.append(item)
+        if item["type"] in generated_types and item["type"] != "技能归一":
+            continue
+        item["targetId"] = item.get("targetId", fallback_target_ids.get(item["type"], item["id"]))
+        items.append(item)
 
     return items
 

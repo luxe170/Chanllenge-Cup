@@ -1,18 +1,23 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.app.responses import ok
-from backend.app.services.resume_service import create_resume_task, get_resume_task, update_resume_skills
+from backend.app.services.resume_service import create_resume_task, get_resume_task, patch_resume_skills, update_resume_skills
 
 router = APIRouter(prefix="/api/v1", tags=["简历解析"])
 
 
 class ResumeSkillsPatch(BaseModel):
-    skills: list[dict]
+    skills: list[dict] | None = None
+    added: list[dict] = Field(default_factory=list)
+    removed: list[str] = Field(default_factory=list)
+    updated: list[dict] = Field(default_factory=list)
 
 
 @router.post("/resume-tasks")
-async def resume_tasks(file: UploadFile = File(...)) -> dict:
+async def resume_tasks(file: UploadFile | None = File(default=None)) -> dict:
+    if file is None:
+        return ok(create_resume_task())
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="上传的简历为空")
@@ -26,9 +31,17 @@ async def resume_tasks(file: UploadFile = File(...)) -> dict:
 
 @router.get("/resume-tasks/{task_id}")
 def resume_task(task_id: str) -> dict:
-    return ok(get_resume_task(task_id))
+    try:
+        return ok(get_resume_task(task_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.patch("/resume-tasks/{task_id}/skills")
 def resume_task_skills(task_id: str, payload: ResumeSkillsPatch) -> dict:
-    return ok(update_resume_skills(task_id, payload.skills))
+    try:
+        if payload.skills is not None:
+            return ok(update_resume_skills(task_id, payload.skills))
+        return ok(patch_resume_skills(task_id, added=payload.added, removed=payload.removed, updated=payload.updated))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

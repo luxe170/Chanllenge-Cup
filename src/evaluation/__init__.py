@@ -1,1 +1,1 @@
-"""Evaluation dataset selection and metric tooling."""
+"""Evaluation dataset, labeling, and metric utilities for Career Prism."""

@@ -1,4 +1,4 @@
-import type { ApiResponse, ChangeEvidence, DashboardSummary, EvaluationSummary, EvidenceDetail, EvolutionChange, EmergingPosition, GraphData, GraphMode, GraphNodeDetail, GraphRoot, GraphSearchItem, JdBatch, MatchReport, PositionProfile, ResumeSkill, ResumeTask, ReviewItem, ReviewStatus } from '../types'
+import type { ApiResponse, ChangeEvidence, DashboardSummary, EvaluationSummary, EvidenceDetail, EvolutionChange, EmergingPosition, GraphData, GraphMode, GraphNodeDetail, GraphRoot, GraphSearchItem, JdBatch, MatchReport, PositionProfile, ResumeSkill, ResumeSkillPatch, ResumeTask, ReviewItem, ReviewStatus } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
@@ -81,7 +81,10 @@ export const api = {
     return request<{ taskId: string; status: string; progress: number }>('/api/v1/resume-tasks', { method: 'POST', body })
   },
   getResumeTask: (taskId: string): Promise<ApiResponse<ResumeTask>> => request<ResumeTask>(`/api/v1/resume-tasks/${taskId}`),
-  updateResumeSkills: (taskId: string, skills: ResumeSkill[]): Promise<ApiResponse<{ taskId: string; skills: ResumeSkill[] }>> => request<{ taskId: string; skills: ResumeSkill[] }>(`/api/v1/resume-tasks/${taskId}/skills`, { method: 'PATCH', body: { skills } }),
+  updateResumeSkills: (taskId: string, skills: ResumeSkill[] | ResumeSkillPatch): Promise<ApiResponse<{ taskId: string; skills: ResumeSkill[] }>> => {
+    const body = Array.isArray(skills) ? { skills } : skills
+    return request<{ taskId: string; skills: ResumeSkill[] }>(`/api/v1/resume-tasks/${taskId}/skills`, { method: 'PATCH', body })
+  },
   createMatch: (resumeTaskId: string, positionId: string): Promise<ApiResponse<MatchReport>> => request<MatchReport>('/api/v1/matches', { method: 'POST', body: { resumeTaskId, positionId } }),
   getLearningPath: (matchId: string): Promise<ApiResponse<{ matchId: string; items: MatchReport['learningPath'] }>> => request<{ matchId: string; items: MatchReport['learningPath'] }>(`/api/v1/matches/${matchId}/learning-path`),
 }

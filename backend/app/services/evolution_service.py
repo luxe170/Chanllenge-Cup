@@ -38,6 +38,7 @@ POSITION_ALIASES = {
     "pos_llm_engineer": [
         "llm",
         "大模型",
+        "大语言模型",
         "rag",
         "检索增强",
         "评测",
@@ -73,6 +74,94 @@ POSITION_ALIASES = {
         "ai coding",
         "前端开发",
     ],
+    "pos_algorithm_engineer": [
+        "算法",
+        "推荐",
+        "搜索",
+        "广告",
+        "机器学习",
+        "深度学习",
+        "nlp",
+        "cv",
+        "计算机视觉",
+        "多模态",
+        "语音识别",
+        "风控",
+    ],
+    "pos_backend_engineer": [
+        "后端",
+        "服务端",
+        "后台",
+        "平台研发",
+        "基础架构",
+        "微服务",
+        "go",
+        "golang",
+    ],
+    "pos_test_engineer": [
+        "测试开发",
+        "自动化测试",
+        "质量工程",
+        "测试工程师",
+        "qa",
+    ],
+    "pos_data_engineer": [
+        "数据开发",
+        "数据平台",
+        "数据仓库",
+        "大数据",
+        "数仓",
+        "数据工程",
+        "bi",
+    ],
+    "pos_cloud_infra_engineer": [
+        "云计算",
+        "云网络",
+        "云数据库",
+        "运维",
+        "sre",
+        "devops",
+        "基础设施",
+        "kubernetes",
+        "容器",
+    ],
+    "pos_security_engineer": [
+        "安全工程师",
+        "安全研发",
+        "网络安全",
+        "内容安全",
+        "大模型安全",
+        "风控",
+        "攻防",
+    ],
+    "pos_hardware_engineer": [
+        "硬件",
+        "芯片",
+        "soc",
+        "risc-v",
+        "riscv",
+        "npu",
+        "cuda",
+        "编译器",
+        "异构计算",
+        "嵌入式",
+    ],
+    "pos_storage_database_engineer": [
+        "存储",
+        "数据库",
+        "mysql",
+        "rds",
+        "redis",
+        "搜索引擎",
+    ],
+    "pos_game_engineer": [
+        "游戏引擎",
+        "渲染引擎",
+        "图形",
+        "客户端",
+        "unity",
+        "ue",
+    ],
 }
 
 # Position identity is determined from the title, not from skills mentioned in
@@ -80,22 +169,41 @@ POSITION_ALIASES = {
 # folded into an existing AI position before novelty detection can run.
 POSITION_TITLE_ALIASES = {
     "pos_ai_agent_engineer": ["ai agent", "agent研发", "agent工程师", "智能体研发", "智能体工程师"],
-    "pos_llm_engineer": ["大模型应用工程师", "大模型工程师", "llm工程师", "生成式ai工程师"],
-    "pos_java_engineer": ["java开发", "java后端", "java工程师"],
+    "pos_llm_engineer": ["大模型应用工程师", "大模型应用算法", "大模型应用评测", "ai应用开发", "模型策略", "模型训练", "大模型工程师", "大语言模型", "llm工程师", "生成式ai工程师"],
+    "pos_algorithm_engineer": ["算法工程师", "算法研发", "算法专家", "算法研究员", "推荐算法", "搜索算法", "广告算法", "nlp算法", "机器学习", "深度学习", "多模态算法", "语音识别算法", "数据挖掘", "音频后处理算法", "计算机视觉", "cv算法", "aigc"],
+    "pos_java_engineer": ["java开发", "java研发", "java后端", "java工程师"],
+    "pos_backend_engineer": ["后端开发", "后端研发", "服务端", "后台开发", "平台研发", "基础架构研发", "网络研发", "go开发", "golang"],
+    "pos_test_engineer": ["测试开发", "自动化测试", "测试工程师", "质量工程", "研发效能"],
+    "pos_data_engineer": ["数据开发", "数据平台", "数据仓库", "大数据开发", "数仓", "数据工程", "数据研发"],
     "pos_data_analyst": ["数据分析师", "数据分析工程师"],
-    "pos_frontend_engineer": ["前端开发", "前端研发", "前端工程师"],
+    "pos_cloud_infra_engineer": ["云计算", "云原生", "云网络", "云数据库", "idc资产", "基础设施", "infra", "gpu训练", "集群通信", "solution architect", "运维", "sre", "devops", "容器"],
+    "pos_security_engineer": ["安全工程师", "安全研发", "安全运营", "网络安全", "内容安全", "大模型安全", "风控"],
+    "pos_hardware_engineer": ["硬件", "芯片", "soc", "risc-v", "riscv", "npu", "cuda", "编译器", "异构计算", "嵌入式", "camera性能", "性能功耗", "推理性能优化"],
+    "pos_storage_database_engineer": ["存储", "数据库", "mysql", "rds", "redis", "搜索引擎"],
+    "pos_frontend_engineer": ["前端开发", "前端研发", "前端工程师", "前端基础"],
+    "pos_game_engineer": ["游戏引擎", "渲染引擎", "图形开发", "客户端开发"],
 }
 
 SKILL_ALIASES = {
     "skill_llm": ["llm", "大语言模型", "大模型", "foundation model"],
     "skill_rag": ["rag", "retrieval augmented", "检索增强", "向量检索"],
     "skill_python": ["python"],
+    "skill_go": ["go", "golang"],
+    "skill_cpp": ["c++", "cpp"],
     "skill_prompt": ["prompt", "提示词工程", "prompt engineering"],
     "skill_multi_agent": ["multi-agent", "多智能体", "agent workflow", "agent协同", "tool use"],
     "skill_rag_eval": ["rag评测", "评测", "benchmark", "eval", "模型评测"],
     "skill_java": ["java"],
     "skill_spring": ["spring", "springboot"],
     "skill_cloud_native": ["云原生", "kubernetes", "docker", "k8s"],
+    "skill_distributed": ["分布式", "微服务", "高并发"],
+    "skill_algorithm": ["算法", "推荐", "搜索", "机器学习", "深度学习"],
+    "skill_nlp": ["nlp", "自然语言处理"],
+    "skill_multimodal": ["多模态", "aigc", "视觉理解", "语音识别"],
+    "skill_testing": ["测试开发", "自动化测试", "质量保障", "qa"],
+    "skill_security": ["安全", "风控", "攻防", "数据安全"],
+    "skill_database": ["数据库", "mysql", "rds", "redis", "存储"],
+    "skill_hardware": ["硬件", "芯片", "soc", "cuda", "npu", "异构计算"],
     "skill_sql": ["sql", "mysql", "hive"],
     "skill_excel": ["excel", "报表", "dashboard"],
     "skill_ai_codegen": ["ai coding", "ai编程", "代码生成", "copilot", "cursor"],
@@ -106,20 +214,39 @@ POSITION_NAME_MAP = {
     "pos_ai_agent_engineer": "AI Agent 研发工程师",
     "pos_llm_engineer": "大模型应用工程师",
     "pos_java_engineer": "Java 开发工程师",
+    "pos_backend_engineer": "后端研发工程师",
+    "pos_algorithm_engineer": "算法工程师",
+    "pos_test_engineer": "测试开发工程师",
+    "pos_data_engineer": "数据开发工程师",
     "pos_data_analyst": "数据分析师",
+    "pos_cloud_infra_engineer": "云计算与基础设施工程师",
+    "pos_security_engineer": "安全工程师",
+    "pos_hardware_engineer": "硬件与芯片工程师",
+    "pos_storage_database_engineer": "存储与数据库工程师",
     "pos_frontend_engineer": "前端研发工程师",
+    "pos_game_engineer": "游戏引擎工程师",
 }
 
 SKILL_NAME_MAP = {
     "skill_llm": "大语言模型",
     "skill_rag": "RAG",
     "skill_python": "Python",
+    "skill_go": "Go",
+    "skill_cpp": "C/C++",
     "skill_prompt": "Prompt 工程",
     "skill_multi_agent": "多智能体协作",
     "skill_rag_eval": "RAG 评测",
     "skill_java": "Java",
     "skill_spring": "Spring 框架",
     "skill_cloud_native": "云原生",
+    "skill_distributed": "分布式系统",
+    "skill_algorithm": "算法工程",
+    "skill_nlp": "NLP",
+    "skill_multimodal": "多模态",
+    "skill_testing": "自动化测试",
+    "skill_security": "安全风控",
+    "skill_database": "数据库与存储",
+    "skill_hardware": "硬件与异构计算",
     "skill_sql": "SQL",
     "skill_excel": "Excel / 报表",
     "skill_ai_codegen": "AI 辅助开发",
@@ -148,6 +275,10 @@ def _parse_datetime(value: Optional[str]) -> datetime:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=None)
     return parsed.astimezone().replace(tzinfo=None)
+
+
+def _record_time_value(record: Dict[str, Any]) -> str:
+    return str(record.get("publish_time") or record.get("scraped_at") or "")
 
 
 def _normalize_text(value: Any) -> str:
@@ -198,8 +329,8 @@ def _display_candidate_title(records: List[Dict[str, Any]]) -> str:
     return max(set(titles), key=titles.count) if titles else "未命名岗位"
 
 
-def _load_job_records() -> List[Dict[str, Any]]:
-    path = _job_data_path()
+def _load_job_records(path: Path | str | None = None) -> List[Dict[str, Any]]:
+    path = Path(path) if path is not None else _job_data_path()
     if not path.exists():
         return []
 
@@ -212,10 +343,11 @@ def _load_job_records() -> List[Dict[str, Any]]:
                 item = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if not item.get("publish_time"):
+            time_value = _record_time_value(item)
+            if not time_value:
                 continue
             item["_position_id"] = _position_for_record(item)
-            item["_parsed_time"] = _parse_datetime(item["publish_time"])
+            item["_parsed_time"] = _parse_datetime(time_value)
             records.append(item)
     return sorted(records, key=lambda r: r["_parsed_time"])
 

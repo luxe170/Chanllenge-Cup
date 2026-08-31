@@ -8,6 +8,9 @@ export interface DashboardSummary {
   validCount: number
   emergingCount: number
   changedCount: number
+  graphTrainCount?: number
+  jdTestCount?: number
+  holdoutCount?: number
   metrics: EvaluationMetric[]
 }
 
@@ -38,6 +41,7 @@ export interface EvaluationMetric {
   value: number
   target: number
   sampleCount: number
+  source?: string
 }
 
 export interface GraphNode {
@@ -231,10 +235,18 @@ export interface ChangeRecord {
 }
 
 export interface ResumeSkill {
+  id?: string
   name: string
   level: '熟悉' | '掌握' | '精通'
   source: string
   confidence: number
+}
+
+export interface ResumeSkillPatch {
+  skills?: ResumeSkill[]
+  added?: ResumeSkill[]
+  removed?: string[]
+  updated?: Partial<ResumeSkill>[]
 }
 
 export interface ResumeExperience {
@@ -257,8 +269,13 @@ export interface ParsedResumeProfile {
 
 export interface ResumeTask {
   taskId: string
+  id?: string
+  filename?: string
+  fileSize?: number
   status: 'pending' | 'processing' | 'completed' | 'failed'
   progress: number
+  createdAt?: string
+  updatedAt?: string
   error?: string
   result?: ParsedResumeProfile
 }

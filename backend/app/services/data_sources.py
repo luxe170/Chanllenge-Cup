@@ -47,6 +47,12 @@ def data_source_status() -> dict[str, Any]:
         "graph_edges.jsonl",
         "review_candidates.jsonl",
         "relevant_jobs.jsonl",
+        "splits/graph_train_200.jsonl",
+        "splits/jd_test_set_100.jsonl",
+        "splits/jd_holdout_336.jsonl",
+        "splits/split_report.json",
+        "evaluation/jd_gold_labels.jsonl",
+        "evaluation/jd_evaluation_report.json",
     ]
     states = []
     for filename in files:

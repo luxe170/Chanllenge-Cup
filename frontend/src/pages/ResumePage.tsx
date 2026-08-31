@@ -27,12 +27,19 @@ export default function ResumePage() {
   const [profile, setProfile] = useState<ParsedResumeProfile>(fallbackProfile)
   const [taskId, setTaskId] = useState('demo_resume_task')
   const [parseError, setParseError] = useState('')
+  const [resumeMetric, setResumeMetric] = useState({ value: 92.4, sampleCount: 108 })
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.getResumeTask('demo_resume_task')
       .then((res) => res.data.result && setProfile(res.data.result))
       .catch(() => setProfile(fallbackProfile))
+    api.getEvaluationSummary()
+      .then((res) => {
+        const metric = res.data.metrics.find((item) => item.name === '简历提取准确率')
+        if (metric) setResumeMetric({ value: metric.value, sampleCount: metric.sampleCount })
+      })
+      .catch(() => setResumeMetric({ value: 92.4, sampleCount: 108 }))
   }, [])
 
   const parseResume = (file: File) => {
@@ -80,7 +87,7 @@ export default function ResumePage() {
           {parseError && <p role="alert">{parseError}</p>}
           {fileName && <div className="file-item"><span><FileText size={19} /></span><div><strong>{fileName}</strong><small>1.8 MB · {parsed ? '解析完成' : '处理中'}</small></div>{parsed ? <CheckCircle2 size={18} className="success-icon" /> : <LoaderCircle size={18} className="spinner" />}</div>}
           <button className="ghost-button full-button" onClick={() => inputRef.current?.click()}><RotateCcw size={15} />重新上传</button>
-          <div className="parser-metric"><WandSparkles size={18} /><div><strong>92.4% 简历提取准确率</strong><span>基于 108 份人工标注简历验证</span></div></div>
+          <div className="parser-metric"><WandSparkles size={18} /><div><strong>{resumeMetric.value}% 简历提取准确率</strong><span>基于 {resumeMetric.sampleCount} 份人工标注简历验证</span></div></div>
         </aside>
 
         <section className={`panel resume-result ${parsed ? 'visible' : ''}`}>

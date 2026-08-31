@@ -14,5 +14,3 @@ tmp/
 output/*
 !output/.gitkeep
 
-data/processed/*
-!data/processed/.gitkeep
