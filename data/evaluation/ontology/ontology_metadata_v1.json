@@ -1,0 +1,10 @@
+{
+  "version": "v1",
+  "generated_at": "2026-08-31T10:44:11+00:00",
+  "status": "draft_pending_human_review",
+  "position_count": 42,
+  "position_alias_count": 168,
+  "skill_count": 80,
+  "skill_alias_count": 142,
+  "ground_truth_count": 120
+}
