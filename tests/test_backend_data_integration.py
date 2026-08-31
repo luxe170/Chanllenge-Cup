@@ -37,7 +37,8 @@ def test_dashboard_summary_uses_real_local_data_files() -> None:
     assert summary["holdoutCount"] == split_report["holdoutCount"]
     assert summary["metrics"][0]["sampleCount"] == split_report["jdTestCount"]
     assert summary["changedCount"] == expected_changes
-    assert all(metric["source"] == "backend_demo_metric" for metric in summary["metrics"])
+    assert summary["metrics"][0]["source"] in {"backend_demo_metric", "deepseek_gold_evaluation"}
+    assert all(metric["source"] == "backend_demo_metric" for metric in summary["metrics"][1:])
 
 
 def test_evaluation_summary_counts_current_pending_reviews() -> None:

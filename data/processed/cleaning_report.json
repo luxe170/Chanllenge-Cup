@@ -1,0 +1,12 @@
+{
+  "accepted_records": 636,
+  "duplicate_content_records_retained": 1810,
+  "duplicate_source_records_removed": 0,
+  "input_records": 8099,
+  "missing_publish_time_records": 45,
+  "rejected_records": 535,
+  "review_records": 6928,
+  "status_rejected_records": 535,
+  "status_relevant_records": 636,
+  "status_review_records": 6928
+}
