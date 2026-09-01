@@ -17,8 +17,19 @@ class DataLlmBoundaryTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
         self.assertFalse(data["llmRuntimeRequired"])
-        self.assertFalse(data["onlineLlmEnabled"])
+        self.assertIn("configured", data["llmConfig"])
+        self.assertNotIn("apiKey", data["llmConfig"])
+        self.assertNotIn("secret", str(data["llmConfig"]).lower())
         self.assertIn("rule_outputs", data["readPriority"])
+
+    def test_llm_config_status_does_not_return_secret(self) -> None:
+        response = self.client.get("/api/v1/llm/config/status")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertIn("configured", data)
+        self.assertIn("model", data)
+        self.assertNotIn("key", data)
 
     def test_rule_graph_seed_has_valid_edges(self) -> None:
         nodes, edges = build_graph_seed()

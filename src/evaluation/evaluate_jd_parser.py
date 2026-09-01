@@ -2,39 +2,20 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from backend.app.services.data_sources import read_jsonl
 from backend.app.services.evolution_service import (
     POSITION_NAME_MAP,
-    SKILL_ALIASES,
     SKILL_NAME_MAP,
-    _match_aliases,
-    _position_for_record,
-    _record_text,
 )
+from src.processing.extract_jd_predictions import DEFAULT_TEST_PREDICTION_OUTPUT, predict_jd_label, record_id
 
 
-def _record_id(record: dict[str, Any]) -> str:
-    return str(record.get("source_id") or record.get("content_hash") or record.get("source_job_id") or "")
-
-
-def predict_jd_label(record: dict[str, Any]) -> dict[str, Any]:
-    text = _record_text(record)
-    skills = []
-    for skill_id, aliases in SKILL_ALIASES.items():
-        if _match_aliases(text, aliases):
-            skills.append({"id": skill_id, "name": SKILL_NAME_MAP.get(skill_id, skill_id)})
-
-    position_id = _position_for_record(record)
-    return {
-        "sourceId": _record_id(record),
-        "positionId": position_id,
-        "positionName": POSITION_NAME_MAP.get(position_id, "候选新岗位"),
-        "skills": sorted(skills, key=lambda item: item["id"]),
-    }
+def _generated_at() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _skill_ids(label: dict[str, Any]) -> set[str]:
@@ -51,10 +32,34 @@ def _position_match(predicted: str, expected: str) -> bool:
     return predicted == expected
 
 
-def evaluate_jd_parser(test_path: Path, labels_path: Path, output_path: Path) -> dict[str, Any]:
+def evaluate_jd_parser(
+    test_path: Path,
+    labels_path: Path,
+    output_path: Path,
+    predictions_output_path: Path | None = None,
+    predictions_input_path: Path | None = None,
+    run_label: str = "rule run",
+) -> dict[str, Any]:
     records = read_jsonl(test_path)
     labels = read_jsonl(labels_path)
     labels_by_id = {str(label.get("sourceId")): label for label in labels if label.get("sourceId")}
+    generated_at = _generated_at()
+    predictions_by_id: dict[str, dict[str, Any]] = {}
+    if predictions_input_path is None:
+        predictions = []
+        for record in records:
+            predicted = predict_jd_label(record, split="jd_test", generated_at=generated_at)
+            predictions.append(predicted)
+            predictions_by_id[str(predicted.get("sourceId"))] = predicted
+    else:
+        predictions = read_jsonl(predictions_input_path)
+        predictions_by_id = {str(item.get("sourceId") or item.get("evaluation_id")): item for item in predictions}
+
+    if predictions_output_path is not None:
+        predictions_output_path.parent.mkdir(parents=True, exist_ok=True)
+        with predictions_output_path.open("w", encoding="utf-8", newline="\n") as fh:
+            for item in predictions:
+                fh.write(json.dumps(item, ensure_ascii=False) + "\n")
 
     total = 0
     position_correct = 0
@@ -65,7 +70,7 @@ def evaluate_jd_parser(test_path: Path, labels_path: Path, output_path: Path) ->
     invalid_labels: list[str] = []
 
     for record in records:
-        source_id = _record_id(record)
+        source_id = record_id(record)
         expected = labels_by_id.get(source_id)
         if expected is None:
             continue
@@ -75,7 +80,9 @@ def evaluate_jd_parser(test_path: Path, labels_path: Path, output_path: Path) ->
             invalid_labels.append(source_id)
             continue
 
-        predicted = predict_jd_label(record)
+        predicted = predictions_by_id.get(source_id)
+        if predicted is None:
+            continue
         predicted_skills = {skill["id"] for skill in predicted["skills"]}
         expected_skills = _skill_ids(expected)
 
@@ -113,9 +120,12 @@ def evaluate_jd_parser(test_path: Path, labels_path: Path, output_path: Path) ->
     overall_accuracy = (position_accuracy + skill_f1) / 2
 
     report = {
-        "generatedAt": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "generatedAt": _generated_at(),
         "testSetPath": str(test_path),
         "labelPath": str(labels_path),
+        "runLabel": run_label,
+        "predictionPath": str(predictions_output_path) if predictions_output_path is not None else "",
+        "predictionInputPath": str(predictions_input_path) if predictions_input_path is not None else "",
         "sampleCount": total,
         "labelCount": len(labels),
         "missingLabelCount": len(records) - total,
@@ -129,7 +139,7 @@ def evaluate_jd_parser(test_path: Path, labels_path: Path, output_path: Path) ->
         "skillTruePositive": skill_tp,
         "skillFalsePositive": skill_fp,
         "skillFalseNegative": skill_fn,
-        "labeler": "deepseek-v4-flash",
+        "labeler": "deepseek-v4-flash" if predictions_input_path is None else "LLM runs",
         "metricSource": "deepseek_gold_evaluation",
         "errorCases": error_cases[:30],
     }
@@ -143,9 +153,19 @@ def main() -> None:
     parser.add_argument("--test-set", type=Path, default=Path("data/processed/splits/jd_test_set_100.jsonl"))
     parser.add_argument("--labels", type=Path, default=Path("data/processed/evaluation/jd_gold_labels.jsonl"))
     parser.add_argument("--output", type=Path, default=Path("data/processed/evaluation/jd_evaluation_report.json"))
+    parser.add_argument("--predictions-output", type=Path, default=DEFAULT_TEST_PREDICTION_OUTPUT)
+    parser.add_argument("--predictions-input", type=Path, default=None)
+    parser.add_argument("--run-label", default="rule run")
     args = parser.parse_args()
 
-    report = evaluate_jd_parser(args.test_set, args.labels, args.output)
+    report = evaluate_jd_parser(
+        args.test_set,
+        args.labels,
+        args.output,
+        args.predictions_output,
+        predictions_input_path=args.predictions_input,
+        run_label=args.run_label,
+    )
     print(
         "evaluated JD parser: "
         f"sampleCount={report['sampleCount']} "

@@ -7,7 +7,7 @@ from backend.app.services.resume_service import get_resume_task
 
 
 _match_reports: dict[str, dict] = {}
-LEVEL_SCORE = {"熟悉": 0.7, "掌握": 0.85, "精通": 1.0}
+LEVEL_SCORE = {"了解": 0.55, "熟悉": 0.7, "掌握": 0.85, "精通": 1.0}
 
 
 def _position_requirements(position_id: str) -> tuple[dict, list[dict]]:
@@ -33,6 +33,42 @@ def _learning_path(gaps: list[dict]) -> list[dict]:
     groups = [gaps[index:index + 2] for index in range(0, min(len(gaps), 6), 2)]
     titles = ["补齐高优先级基础", "完成岗位场景实践", "形成综合项目证据"]
     return [{"stage": index + 1, "title": titles[min(index, 2)], "duration": f"{index + 1}–{index + 2} 周", "skills": [gap["name"] for gap in group], "goal": f"掌握{'、'.join(gap['name'] for gap in group)}并完成可验证练习"} for index, group in enumerate(groups)]
+
+
+def _resume_learning_path(profile: dict) -> list[dict]:
+    path = []
+    raw_items = profile.get("learningSuggestions", [])
+    if not isinstance(raw_items, list):
+        return path
+    for index, item in enumerate(raw_items[:6]):
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        if not title:
+            continue
+        skills = [
+            str(skill).strip()
+            for skill in item.get("skills", [])
+            if str(skill).strip()
+        ][:6]
+        actions = [
+            str(action).strip()
+            for action in item.get("actions", [])
+            if str(action).strip()
+        ][:3]
+        goal = str(item.get("expectedOutcome") or item.get("goal") or item.get("reason") or "").strip()
+        if actions:
+            goal = f"{goal}；行动：{'、'.join(actions)}" if goal else f"行动：{'、'.join(actions)}"
+        path.append(
+            {
+                "stage": int(item.get("stage") or index + 1),
+                "title": title,
+                "duration": str(item.get("duration") or "1–2 周"),
+                "skills": skills,
+                "goal": goal or "完成可验证练习并补充项目证据",
+            }
+        )
+    return path
 
 
 def _build_match_report(resume_task_id: str, profile: dict, position_id: str, persist: bool = True) -> dict:
@@ -72,7 +108,7 @@ def _build_match_report(resume_task_id: str, profile: dict, position_id: str, pe
         "dimensions": [{"name": "必备技能", "value": required_score, "color": "#6ee7f9"}, {"name": "加分技能", "value": preferred_score, "color": "#a78bfa"}, {"name": "项目经验", "value": project_score, "color": "#5ee7a8"}, {"name": "技能深度", "value": depth_score, "color": "#fbbf73"}],
         "strengths": strengths, "gaps": gaps[:8], "evidence": {"skillEvidenceCount": len(skills), "projectEvidenceCount": len(experiences), "jobSampleCount": int(position.get("sampleCount", 0))},
         "suggestions": [f"优先补齐{gap['name']}，该能力在目标岗位中的重要度为 {gap['weight']}%" for gap in gaps[:3]] or ["技能覆盖较完整，建议补充可量化的项目成果与岗位证据"],
-        "learningPath": _learning_path(gaps),
+        "learningPath": _resume_learning_path(profile) or _learning_path(gaps),
     }
     if persist:
         _match_reports[match_id] = report

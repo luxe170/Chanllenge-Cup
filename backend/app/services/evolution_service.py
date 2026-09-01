@@ -281,6 +281,11 @@ def _partition_at_baseline(records: List[Dict[str, Any]]) -> tuple[List[Dict[str
     return baseline, incoming
 
 
+def _partition_at_midpoint(records: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    midpoint = max(1, len(records) * 40 // 100)
+    return records[:midpoint], records[midpoint:]
+
+
 def _parse_datetime(value: Optional[str]) -> datetime:
     if not value:
         return datetime.min.replace(tzinfo=None)
@@ -385,11 +390,9 @@ def _build_snapshot_windows() -> tuple[Dict[str, Dict[str, Dict[str, Any]]], Dic
     if baseline_count is not None:
         historical, current = _partition_at_baseline(records)
         if not current:
-            return ({}, {})
+            historical, current = _partition_at_midpoint(records)
     else:
-        midpoint = max(1, len(records) * 40 // 100)
-        historical = records[:midpoint]
-        current = records[midpoint:]
+        historical, current = _partition_at_midpoint(records)
 
     def build_window(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Dict[str, Any]]]:
         by_position: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(dict)
@@ -470,6 +473,8 @@ def _build_real_snapshot_data() -> tuple[Dict[str, Dict[str, Dict[str, Any]]], D
     if not current_snapshot:
         return ({}, {}, {})
     _, evidence_records = _partition_at_baseline(records)
+    if not evidence_records:
+        _, evidence_records = _partition_at_midpoint(records)
     evidence_store: Dict[str, Dict[str, Any]] = {}
 
     position_buckets: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -653,6 +658,8 @@ def compute_evidence_detail(evidence_id: str) -> dict:
 def compute_emerging_positions(page: int = 1, page_size: int = 20, keyword: str = "") -> dict:
     all_records = _load_job_records()
     _, records = _partition_at_baseline(all_records)
+    if not records and all_records:
+        records = all_records
     if not records:
         return {"items": [], "total": 0, "page": page, "pageSize": page_size}
 
