@@ -258,6 +258,29 @@ def _job_data_path() -> Path:
     return Path(__file__).resolve().parents[3] / "data" / "processed" / "relevant_jobs.jsonl"
 
 
+def _evolution_baseline_path() -> Path:
+    return Path(__file__).resolve().parents[3] / "data" / "processed" / "evolution_baseline.json"
+
+
+def _baseline_record_count() -> int | None:
+    path = _evolution_baseline_path()
+    if not path.exists():
+        return None
+    try:
+        return max(0, int(json.loads(path.read_text(encoding="utf-8")).get("recordCount", 0)))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def _partition_at_baseline(records: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    count = _baseline_record_count()
+    if count is None:
+        return records, records
+    baseline = [record for record in records if int(record.get("_corpus_index", 0)) < count]
+    incoming = [record for record in records if int(record.get("_corpus_index", 0)) >= count]
+    return baseline, incoming
+
+
 def _parse_datetime(value: Optional[str]) -> datetime:
     if not value:
         return datetime.min.replace(tzinfo=None)
@@ -336,7 +359,7 @@ def _load_job_records(path: Path | str | None = None) -> List[Dict[str, Any]]:
 
     records: List[Dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
+        for corpus_index, line in enumerate(fh):
             if not line.strip():
                 continue
             try:
@@ -348,6 +371,7 @@ def _load_job_records(path: Path | str | None = None) -> List[Dict[str, Any]]:
                 continue
             item["_position_id"] = _position_for_record(item)
             item["_parsed_time"] = _parse_datetime(time_value)
+            item["_corpus_index"] = corpus_index
             records.append(item)
     return sorted(records, key=lambda r: r["_parsed_time"])
 
@@ -357,9 +381,15 @@ def _build_snapshot_windows() -> tuple[Dict[str, Dict[str, Dict[str, Any]]], Dic
     if not records:
         return ({}, {})
 
-    midpoint = max(1, len(records) * 40 // 100)
-    historical = records[:midpoint]
-    current = records[midpoint:]
+    baseline_count = _baseline_record_count()
+    if baseline_count is not None:
+        historical, current = _partition_at_baseline(records)
+        if not current:
+            return ({}, {})
+    else:
+        midpoint = max(1, len(records) * 40 // 100)
+        historical = records[:midpoint]
+        current = records[midpoint:]
 
     def build_window(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Dict[str, Any]]]:
         by_position: Dict[str, Dict[str, Dict[str, Any]]] = defaultdict(dict)
@@ -436,12 +466,14 @@ def _build_real_snapshot_data() -> tuple[Dict[str, Dict[str, Dict[str, Any]]], D
     if not records:
         return ({}, {}, {})
 
-    now = datetime.utcnow()
     history_snapshot, current_snapshot = _build_snapshot_windows()
+    if not current_snapshot:
+        return ({}, {}, {})
+    _, evidence_records = _partition_at_baseline(records)
     evidence_store: Dict[str, Dict[str, Any]] = {}
 
     position_buckets: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-    for record in records:
+    for record in evidence_records:
         position_buckets[record["_position_id"]].append(record)
 
     for position_id, items in position_buckets.items():
@@ -545,14 +577,14 @@ def compute_change_evidence(change_id: str) -> dict:
 
     position_id = matched.positionId
     skill_id = matched.skillId
-    records = _load_job_records()
+    _, records = _partition_at_baseline(_load_job_records())
     hits = [
         (idx, record)
         for idx, record in enumerate(records)
         if record["_position_id"] == position_id
         and _match_aliases(" ".join([record.get("title", ""), record.get("description", ""), record.get("requirement", "")]), SKILL_ALIASES.get(skill_id, []))
     ]
-    evidence_ids = [f"jd_{idx + 1:04d}" for idx, _ in hits[:5]]
+    evidence_ids = [f"jd_{record['_corpus_index'] + 1:04d}" for _, record in hits[:5]]
 
     before = matched.before
     after = matched.after
@@ -590,10 +622,12 @@ def compute_evidence_detail(evidence_id: str) -> dict:
     except ValueError:
         match_index = 0
 
-    if match_index < 0 or match_index >= len(records):
+    if match_index < 0:
         raise KeyError(f"unknown evidenceId: {evidence_id}")
 
-    record = records[match_index]
+    record = next((item for item in records if int(item.get("_corpus_index", -1)) == match_index), None)
+    if record is None:
+        raise KeyError(f"unknown evidenceId: {evidence_id}")
     jd_text = "\n".join(
         [
             record.get("title", ""),
@@ -617,7 +651,8 @@ def compute_evidence_detail(evidence_id: str) -> dict:
 
 
 def compute_emerging_positions(page: int = 1, page_size: int = 20, keyword: str = "") -> dict:
-    records = _load_job_records()
+    all_records = _load_job_records()
+    _, records = _partition_at_baseline(all_records)
     if not records:
         return {"items": [], "total": 0, "page": page, "pageSize": page_size}
 

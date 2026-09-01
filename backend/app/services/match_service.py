@@ -35,9 +35,7 @@ def _learning_path(gaps: list[dict]) -> list[dict]:
     return [{"stage": index + 1, "title": titles[min(index, 2)], "duration": f"{index + 1}–{index + 2} 周", "skills": [gap["name"] for gap in group], "goal": f"掌握{'、'.join(gap['name'] for gap in group)}并完成可验证练习"} for index, group in enumerate(groups)]
 
 
-def create_match(resume_task_id: str, position_id: str) -> dict:
-    task = get_resume_task(resume_task_id)
-    profile = task.get("result") or {}
+def _build_match_report(resume_task_id: str, profile: dict, position_id: str, persist: bool = True) -> dict:
     position, requirements = _position_requirements(position_id)
     resume_skills = {item.get("name", "").lower(): item for item in profile.get("skills", []) if item.get("name")}
     total_weight = sum(max(0.1, item["weight"]) for item in requirements) or 1.0
@@ -70,13 +68,57 @@ def create_match(resume_task_id: str, position_id: str) -> dict:
         "matchId": match_id, "resumeTaskId": resume_task_id, "positionId": position_id, "positionName": position["name"], "candidateName": profile.get("candidateName", "未识别姓名"),
         "overallScore": score, "fitLevel": "高度匹配" if score >= 80 else "中度匹配" if score >= 60 else "有待提升", "benchmarkRank": "暂无排名", "benchmarkSampleCount": 0,
         "summary": f"覆盖 {len(strengths)}/{len(requirements)} 项岗位技能，建议优先补齐 {len(gaps)} 项能力。",
+        "matchedSkillCount": len(strengths), "totalRequirementCount": len(requirements), "gapCount": len(gaps),
         "dimensions": [{"name": "必备技能", "value": required_score, "color": "#6ee7f9"}, {"name": "加分技能", "value": preferred_score, "color": "#a78bfa"}, {"name": "项目经验", "value": project_score, "color": "#5ee7a8"}, {"name": "技能深度", "value": depth_score, "color": "#fbbf73"}],
         "strengths": strengths, "gaps": gaps[:8], "evidence": {"skillEvidenceCount": len(skills), "projectEvidenceCount": len(experiences), "jobSampleCount": int(position.get("sampleCount", 0))},
         "suggestions": [f"优先补齐{gap['name']}，该能力在目标岗位中的重要度为 {gap['weight']}%" for gap in gaps[:3]] or ["技能覆盖较完整，建议补充可量化的项目成果与岗位证据"],
         "learningPath": _learning_path(gaps),
     }
-    _match_reports[match_id] = report
+    if persist:
+        _match_reports[match_id] = report
     return report
+
+
+def create_match(resume_task_id: str, position_id: str) -> dict:
+    task = get_resume_task(resume_task_id)
+    return _build_match_report(resume_task_id, task.get("result") or {}, position_id)
+
+
+def rank_matches(resume_task_id: str, limit: int = 50) -> dict:
+    task = get_resume_task(resume_task_id)
+    profile = task.get("result") or {}
+    positions = [
+        node for node in read_jsonl(processed_path("graph_nodes.jsonl"))
+        if node.get("mode") == "panorama" and node.get("type") == "position"
+    ]
+    reports = [_build_match_report(resume_task_id, profile, position["id"], persist=False) for position in positions]
+    reports.sort(
+        key=lambda report: (
+            -report["overallScore"],
+            -next((dimension["value"] for dimension in report["dimensions"] if dimension["name"] == "必备技能"), 0),
+            report["positionName"],
+        )
+    )
+    items = [
+        {
+            "positionId": report["positionId"],
+            "positionName": report["positionName"],
+            "score": report["overallScore"],
+            "fitLevel": report["fitLevel"],
+            "matchedSkillCount": report["matchedSkillCount"],
+            "totalSkillCount": report["totalRequirementCount"],
+            "strengths": report["strengths"][:3],
+            "gapCount": report["gapCount"],
+        }
+        for report in reports[:max(1, min(limit, 100))]
+    ]
+    return {
+        "resumeTaskId": resume_task_id,
+        "bestPositionId": items[0]["positionId"] if items else "",
+        "bestPositionName": items[0]["positionName"] if items else "暂无可匹配岗位",
+        "bestScore": items[0]["score"] if items else 0,
+        "items": items,
+    }
 
 
 def get_learning_path(match_id: str) -> dict:

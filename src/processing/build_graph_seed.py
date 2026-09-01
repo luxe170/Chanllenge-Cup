@@ -136,14 +136,10 @@ def build_graph_seed(input_path: Path | str | None = None) -> tuple[list[dict[st
             reverse_skill_id = f"reverse_{skill_id}"
             skill_cluster_id, skill_cluster_name = SKILL_CLUSTER_MAP.get(skill_id, ("skill_cluster_other", "通用技能簇"))
             reverse_cluster_id = f"reverse_{skill_cluster_id}"
-            stack_id = "reverse_stack_next_it"
-
-            nodes[stack_id] = {"mode": "skill_reverse", "id": stack_id, "name": "新一代信息技术栈", "type": "stack", "sampleCount": len(records), "confidence": 0.9}
             nodes[reverse_cluster_id] = {"mode": "skill_reverse", "id": reverse_cluster_id, "name": skill_cluster_name, "type": "cluster", "sampleCount": nodes.get(reverse_cluster_id, {}).get("sampleCount", 0) + len(hits), "confidence": 0.88}
             nodes[reverse_skill_id] = {"mode": "skill_reverse", "id": reverse_skill_id, "name": SKILL_NAME_MAP.get(skill_id, skill_id), "type": "skill", "trend": "stable", "weight": weight, "sampleCount": len(hits), "confidence": min(0.97, 0.6 + weight * 0.35)}
             nodes[reverse_position_id] = {"mode": "skill_reverse", "id": reverse_position_id, "name": POSITION_NAME_MAP.get(position_id, position_id), "type": "position", "trend": "stable", "weight": weight, "sampleCount": len(position_records), "confidence": min(0.97, 0.62 + len(position_records) / 100)}
 
-            edges[f"skill_reverse:{reverse_cluster_id}->{stack_id}"] = {"mode": "skill_reverse", "source": reverse_cluster_id, "target": stack_id, "relationship": "BELONGS_TO"}
             edges[f"skill_reverse:{reverse_skill_id}->{reverse_cluster_id}"] = {"mode": "skill_reverse", "source": reverse_skill_id, "target": reverse_cluster_id, "relationship": "BELONGS_TO"}
             edges[f"skill_reverse:{reverse_position_id}->{reverse_skill_id}"] = {
                 "mode": "skill_reverse",

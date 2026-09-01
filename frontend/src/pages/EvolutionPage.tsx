@@ -1,7 +1,6 @@
 import { ArrowRight, ChevronRight, Clock3, DatabaseZap, ExternalLink, FileText, Search, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Confidence, Modal, TrendBadge } from '../components/common'
-import { changeEvidenceMap, emergingPositions, evolutionChanges, positionProfile as fallbackPositionProfile } from '../data/mock'
 import { api } from '../services/api'
 import type { ChangeEvidence, EmergingPosition, EvidenceDetail, EvolutionChange, PositionProfile } from '../types'
 
@@ -41,21 +40,21 @@ export default function EvolutionPage() {
       setChanges(res.data.items)
       if (res.data.items.length) setSelectedId(res.data.items[0].id)
     }).catch(() => {
-      setChanges(evolutionChanges)
-      if (evolutionChanges.length) setSelectedId(evolutionChanges[0].id)
-      setError('岗位演化接口暂不可用，当前展示备用数据。')
+      setChanges([])
+      setSelectedId('')
+      setError('岗位演化接口暂不可用。')
     }).finally(() => {
       setLoading(false)
     })
     api.getEmergingPositions().then((res) => setEmerging(res.data.items)).catch(() => {
-      setEmerging(emergingPositions)
-      setError((message) => message || '新岗位发现接口暂不可用，当前展示备用数据。')
+      setEmerging([])
+      setError((message) => message || '新岗位发现接口暂不可用。')
     })
   }, [])
 
   useEffect(() => {
     if (!selectedId) return
-    api.getChangeEvidence(selectedId).then((res) => setEvidence(res.data)).catch(() => setEvidence(changeEvidenceMap[selectedId] ?? null))
+    api.getChangeEvidence(selectedId).then((res) => setEvidence(res.data)).catch(() => setEvidence(null))
   }, [selectedId])
 
   const filteredChanges = useMemo(() => {
@@ -92,7 +91,7 @@ export default function EvolutionPage() {
       const res = await api.getPosition(item.positionId)
       setPositionProfile(res.data)
     } catch {
-      setPositionProfile(fallbackPositionProfile)
+      setPositionProfile(null)
     } finally {
       setPositionLoading(false)
     }
@@ -176,6 +175,7 @@ export default function EvolutionPage() {
                 <button onClick={() => handleViewEmergingDefinition(item)}>查看岗位定义<ArrowRight size={15} /></button>
               </article>
             ))}
+            {filteredEmerging.length === 0 && <div className="empty-state">暂无新岗位发现</div>}
           </div>
         )}
       </section>

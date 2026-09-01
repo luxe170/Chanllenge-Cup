@@ -1,4 +1,4 @@
-import type { ApiResponse, ChangeEvidence, DashboardSummary, EvaluationSummary, EvidenceDetail, EvolutionChange, EmergingPosition, GraphData, GraphMode, GraphNodeDetail, GraphRoot, GraphSearchItem, JdBatch, MatchReport, PositionProfile, ResumeSkill, ResumeSkillPatch, ResumeTask, ReviewItem, ReviewStatus } from '../types'
+import type { ApiResponse, ChangeEvidence, DashboardSummary, EvaluationSummary, EvidenceDetail, EvolutionChange, EmergingPosition, GraphData, GraphMode, GraphNodeDetail, GraphRoot, GraphSearchItem, JdBatch, MatchRanking, MatchReport, PositionProfile, ResumeSkill, ResumeSkillPatch, ResumeTask, ReviewItem, ReviewStatus } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
@@ -86,5 +86,6 @@ export const api = {
     return request<{ taskId: string; skills: ResumeSkill[] }>(`/api/v1/resume-tasks/${taskId}/skills`, { method: 'PATCH', body })
   },
   createMatch: (resumeTaskId: string, positionId: string): Promise<ApiResponse<MatchReport>> => request<MatchReport>('/api/v1/matches', { method: 'POST', body: { resumeTaskId, positionId } }),
+  rankMatches: (resumeTaskId: string, limit = 50): Promise<ApiResponse<MatchRanking>> => request<MatchRanking>('/api/v1/matches/rank', { method: 'POST', body: { resumeTaskId, limit } }),
   getLearningPath: (matchId: string): Promise<ApiResponse<{ matchId: string; items: MatchReport['learningPath'] }>> => request<{ matchId: string; items: MatchReport['learningPath'] }>(`/api/v1/matches/${matchId}/learning-path`),
 }

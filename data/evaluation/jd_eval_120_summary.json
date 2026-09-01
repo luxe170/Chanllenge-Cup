@@ -1,0 +1,23 @@
+{
+  "count": 120,
+  "seed": "career-prism-jd-eval-v1",
+  "exclusion": "source_id and content_hash from data/processed/relevant_jobs.jsonl",
+  "sourceFiles": {
+    "alibaba_jobs.jsonl": 21,
+    "bytedance_dev_jobs.jsonl": 51,
+    "huawei_jobs.jsonl": 4,
+    "meituan_jobs.jsonl": 6,
+    "tencent_jobs.jsonl": 38
+  },
+  "samplingStrata": {
+    "boundary_noise": 26,
+    "relevant": 94
+  },
+  "companies": {
+    "华为": 4,
+    "字节跳动": 51,
+    "美团": 6,
+    "腾讯": 38,
+    "阿里巴巴": 21
+  }
+}

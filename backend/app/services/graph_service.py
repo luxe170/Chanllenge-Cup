@@ -21,11 +21,18 @@ def _graph_parts(mode: GraphMode) -> tuple[list[dict], list[dict], list[str]]:
     rule_nodes = [node for node in read_jsonl(processed_path("graph_nodes.jsonl")) if node.get("mode") == mode]
     rule_edges = [edge for edge in read_jsonl(processed_path("graph_edges.jsonl")) if edge.get("mode") == mode]
     if rule_nodes and rule_edges:
-        hierarchy = ["stack", "cluster", "skill", "position"] if mode == "skill_reverse" else ["cluster", "position", "skill"]
+        if mode == "skill_reverse":
+            stack_ids = {node["id"] for node in rule_nodes if node.get("type") == "stack"}
+            rule_nodes = [node for node in rule_nodes if node.get("type") != "stack"]
+            rule_edges = [edge for edge in rule_edges if edge.get("source") not in stack_ids and edge.get("target") not in stack_ids]
+        hierarchy = ["cluster", "skill", "position"] if mode == "skill_reverse" else ["cluster", "position", "skill"]
         return rule_nodes, rule_edges, hierarchy
 
     if mode == "skill_reverse":
-        return fresh(SKILL_REVERSE_NODES), fresh(SKILL_REVERSE_EDGES), ["stack", "cluster", "skill", "position"]
+        nodes = [node for node in fresh(SKILL_REVERSE_NODES) if node.get("type") != "stack"]
+        node_ids = {node["id"] for node in nodes}
+        edges = [edge for edge in fresh(SKILL_REVERSE_EDGES) if edge.get("source") in node_ids and edge.get("target") in node_ids]
+        return nodes, edges, ["cluster", "skill", "position"]
     return fresh(PANORAMA_NODES), fresh(PANORAMA_EDGES), ["cluster", "position", "skill"]
 
 
@@ -75,7 +82,7 @@ def get_graph(mode: GraphMode, keyword: str = "", max_nodes: int = 300) -> dict:
 
 def get_graph_roots(mode: GraphMode) -> list[dict]:
     nodes, edges, _ = _graph_parts(mode)
-    root_type = "cluster" if mode == "panorama" else "stack"
+    root_type = "cluster"
     roots = []
     for node in nodes:
         if node["type"] != root_type:
@@ -171,12 +178,10 @@ def validate_graph_edges() -> dict:
 
 
 def _node_description(mode: str, node: dict) -> str:
-    if node["type"] == "stack":
-        return "技术栈是技能体系的顶层领域，向下连接技能簇、技能点及实际需求岗位。"
     if node["type"] == "cluster":
         if mode == "panorama":
             return "岗位簇汇聚职责和技能结构相近的标准岗位，并直接连接岗位层。"
-        return "技能簇归属于技术栈，向下组织含义和用途相近的技能点。"
+        return "技能簇是技能反查的顶层分类，向下组织含义和用途相近的技能点。"
     if node["type"] == "position":
         return f"{node['name']}的标准岗位画像，可查看所属岗位簇以及直接要求的技能点。"
     return f"{node['name']}是可从 JD 和简历中识别的标准技能点，可反向查看需要该技能的岗位。"

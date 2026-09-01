@@ -1,76 +1,100 @@
-import { ArrowRight, BookOpenCheck, Check, CheckCircle2, ChevronDown, CircleAlert, CircleCheck, FileText, Lightbulb, Route, Sparkles, Target, TrendingUp } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowRight, Award, BookOpenCheck, Check, CheckCircle2, ChevronDown, CircleAlert, CircleCheck, FileText, Lightbulb, Route, Search, Sparkles, Target, TrendingUp } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { SectionHeader } from '../components/common'
-import { learningPath, matchDimensions, positionProfile } from '../data/mock'
+import { AppLink } from '../router'
 import { api } from '../services/api'
-import type { GraphNode, MatchReport } from '../types'
-
-const fallbackReport: MatchReport = {
-  matchId: 'fallback_match',
-  resumeTaskId: 'demo_resume_task',
-  positionId: positionProfile.id,
-  positionName: positionProfile.name,
-  candidateName: '陈小雨',
-  overallScore: 82,
-  fitLevel: '高度匹配',
-  benchmarkRank: '前 18%',
-  benchmarkSampleCount: 426,
-  summary: '已覆盖大部分核心要求，重点补齐 2 项能力可显著提升竞争力。',
-  dimensions: matchDimensions,
-  strengths: ['Python', '大语言模型', '向量数据库', 'FastAPI'],
-  gaps: [
-  { name: 'RAG 评测', priority: '高', requirement: '必备技能', current: '未识别', weight: 84 },
-  { name: '多智能体协作', priority: '高', requirement: '加分技能', current: '未识别', weight: 72 },
-  { name: '工具调用', priority: '中', requirement: '必备技能', current: '基础了解', weight: 68 },
-  { name: '模型安全护栏', priority: '中', requirement: '加分技能', current: '未识别', weight: 59 },
-  ],
-  evidence: { skillEvidenceCount: 14, projectEvidenceCount: 2, jobSampleCount: 52 },
-  suggestions: ['突出企业知识库项目中的评测结果', '补充工具调用与任务规划实践', '将模型服务经验关联到工程稳定性'],
-  learningPath,
-}
+import type { MatchRankingItem, MatchReport } from '../types'
 
 export default function MatchPage() {
   const [selectedStage, setSelectedStage] = useState(1)
-  const [report, setReport] = useState<MatchReport>(fallbackReport)
-  const [positions, setPositions] = useState<GraphNode[]>([])
+  const [report, setReport] = useState<MatchReport | null>(null)
+  const [rankings, setRankings] = useState<MatchRankingItem[]>([])
   const [positionId, setPositionId] = useState('')
+  const [positionSearch, setPositionSearch] = useState('')
+  const [positionMenuOpen, setPositionMenuOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [matchError, setMatchError] = useState('')
-  const resumeTaskId = window.sessionStorage.getItem('latestResumeTaskId') ?? 'demo_resume_task'
+  const storedResumeTaskId = window.sessionStorage.getItem('latestResumeTaskId') ?? ''
+  const resumeTaskId = storedResumeTaskId === 'demo_resume_task' ? '' : storedResumeTaskId
 
-  const refreshMatch = (targetPositionId = positionId) => {
+  const refreshMatch = (targetPositionId = positionId, manageLoading = true) => {
     if (!targetPositionId) return
-    setLoading(true)
+    if (manageLoading) setLoading(true)
     setMatchError('')
-    api.createMatch(resumeTaskId, targetPositionId)
+    return api.createMatch(resumeTaskId, targetPositionId)
       .then(async (res) => {
         const path = await api.getLearningPath(res.data.matchId)
         setReport({ ...res.data, learningPath: path.data.items })
         setSelectedStage(path.data.items[0]?.stage ?? 1)
       })
       .catch((error) => setMatchError(error instanceof Error ? error.message : '匹配计算失败'))
+      .finally(() => { if (manageLoading) setLoading(false) })
+  }
+
+  const refreshRanking = () => {
+    setLoading(true)
+    setMatchError('')
+    api.rankMatches(resumeTaskId)
+      .then(async (res) => {
+        setRankings(res.data.items)
+        const target = res.data.bestPositionId
+        setPositionId(target)
+        if (target) await refreshMatch(target, false)
+      })
+      .catch((error) => setMatchError(error instanceof Error ? error.message : '无法完成全部岗位匹配'))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    api.getGraph('panorama')
-      .then((res) => {
-        const available = res.data.nodes.filter((node) => node.type === 'position')
-        setPositions(available)
-        const initial = available.find((node) => node.name.includes('AI Agent'))?.id ?? available[0]?.id ?? ''
-        setPositionId(initial)
-        refreshMatch(initial)
-      })
-      .catch((error) => setMatchError(error instanceof Error ? error.message : '无法加载岗位列表'))
+    if (storedResumeTaskId === 'demo_resume_task') window.sessionStorage.removeItem('latestResumeTaskId')
+    if (resumeTaskId) refreshRanking()
   }, [])
+
+  const selectedRanking = rankings.find((item) => item.positionId === positionId)
+  const bestRanking = rankings[0]
+  const filteredRankings = useMemo(() => {
+    const value = positionSearch.trim().toLowerCase()
+    return value ? rankings.filter((item) => item.positionName.toLowerCase().includes(value)) : rankings
+  }, [positionSearch, rankings])
+
+  const selectPosition = (item: MatchRankingItem) => {
+    setPositionId(item.positionId)
+    setPositionMenuOpen(false)
+    setPositionSearch('')
+    refreshMatch(item.positionId)
+  }
+
+  if (!resumeTaskId) {
+    return <div className="page-stack match-page"><section className="panel match-empty-state"><Target size={34} /><h2>请先上传并解析简历</h2><p>系统需要基于真实简历能力画像计算岗位排名、能力差距和学习路径，不会再展示示例评分。</p><AppLink to="/resume" className="primary-button">前往简历解析<ArrowRight size={16} /></AppLink></section></div>
+  }
+
+  if (!report) {
+    return <div className="page-stack match-page"><section className="panel match-empty-state"><Target size={34} /><h2>{loading ? '正在计算真实岗位匹配' : '暂时无法生成匹配诊断'}</h2><p>{matchError || '正在读取简历并评估全部岗位，请稍候。'}</p>{!loading && <button className="primary-button" onClick={refreshRanking}>重新评估</button>}</section></div>
+  }
 
   return (
     <div className="page-stack match-page">
       <section className="match-selector panel">
         <div className="candidate-selector"><span className="candidate-avatar">{report.candidateName.slice(0, 1)}</span><div><small>候选人</small><strong>{report.candidateName}</strong></div></div>
         <div className="matching-arrow"><span /><Target size={22} /><span /></div>
-        <div className="position-selector"><span className="position-icon"><Sparkles size={20} /></span><div><small>目标岗位</small><select value={positionId} onChange={(event) => setPositionId(event.target.value)}>{positions.map((position) => <option value={position.id} key={position.id}>{position.name}</option>)}</select></div><ChevronDown size={16} /></div>
-        <button className="primary-button" disabled={loading || !positionId} onClick={() => refreshMatch()}>{loading ? '计算中…' : '重新计算匹配'}</button>
+        {bestRanking && <button className="best-position-card" onClick={() => selectPosition(bestRanking)}><span className="best-position-icon"><Award size={19} /></span><span><small>系统最高匹配</small><strong>{bestRanking.positionName}</strong><em>{bestRanking.matchedSkillCount}/{bestRanking.totalSkillCount} 项技能匹配</em></span><b>{bestRanking.score}<small>分</small></b></button>}
+        <div className="position-selector ranked-position-selector">
+          <span className="position-icon"><Sparkles size={20} /></span>
+          <button className="position-selector-trigger" onClick={() => setPositionMenuOpen((value) => !value)} aria-expanded={positionMenuOpen}>
+            <span><small>{positionId === bestRanking?.positionId ? '当前岗位 · 推荐最高分' : '查看其他目标岗位'}</small><strong>{selectedRanking?.positionName ?? '选择岗位'}</strong></span>
+            {selectedRanking && <em>{selectedRanking.score} 分</em>}<ChevronDown size={16} />
+          </button>
+          {positionMenuOpen && <div className="position-ranking-menu">
+            <label><Search size={15} /><input autoFocus value={positionSearch} onChange={(event) => setPositionSearch(event.target.value)} placeholder="搜索岗位名称" /></label>
+            <div className="position-ranking-list">
+              {filteredRankings.map((item, index) => <button className={item.positionId === positionId ? 'active' : ''} key={item.positionId} onClick={() => selectPosition(item)}>
+                <i>{rankings.indexOf(item) + 1}</i><span><strong>{item.positionName}</strong><small>{item.fitLevel} · 匹配 {item.matchedSkillCount}/{item.totalSkillCount} 项技能</small><em>{item.strengths.length ? item.strengths.join(' · ') : '暂无已匹配技能'}</em></span><b>{item.score}</b>{index === 0 && !positionSearch && <u>推荐</u>}
+              </button>)}
+              {filteredRankings.length === 0 && <p>没有找到相关岗位</p>}
+            </div>
+          </div>}
+        </div>
+        <button className="primary-button" disabled={loading} onClick={refreshRanking}>{loading ? '评估中…' : '重新评估全部岗位'}</button>
       </section>
       {matchError && <p role="alert">匹配失败：{matchError}</p>}
 
@@ -117,7 +141,7 @@ export default function MatchPage() {
           <div className="stage-navigation">
             {report.learningPath.map((step) => <button className={selectedStage === step.stage ? 'active' : ''} onClick={() => setSelectedStage(step.stage)} key={step.stage}><i>{step.stage}</i><span><small>阶段 {step.stage} · {step.duration}</small><strong>{step.title}</strong></span><ArrowRight size={16} /></button>)}
           </div>
-          {report.learningPath.filter((step) => step.stage === selectedStage).map((step) => <div className="stage-detail" key={step.stage}><span className="stage-icon"><Route size={24} /></span><span className="section-eyebrow">STAGE {step.stage}</span><h3>{step.title}</h3><p>{step.goal}</p><div><span>重点技能</span><div className="tag-list">{step.skills.map((skill) => <em key={skill}>{skill}</em>)}</div></div><div className="stage-outcome"><CircleCheck size={17} /><span><strong>阶段成果</strong>完成可展示项目并通过能力自测</span></div><button className="primary-button">查看学习任务<ArrowRight size={15} /></button></div>)}
+          {report.learningPath.filter((step) => step.stage === selectedStage).map((step) => <div className="stage-detail" key={step.stage}><span className="stage-icon"><Route size={24} /></span><span className="section-eyebrow">STAGE {step.stage}</span><h3>{step.title}</h3><p>{step.goal}</p><div><span>重点技能</span><div className="tag-list">{step.skills.map((skill) => <em key={skill}>{skill}</em>)}</div></div><div className="stage-outcome"><CircleCheck size={17} /><span><strong>阶段成果</strong>完成可展示项目并通过能力自测</span></div></div>)}
         </div>
       </section>
     </div>

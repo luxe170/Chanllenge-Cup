@@ -1,0 +1,12 @@
+{
+  "count": 120,
+  "status": "draft_requires_independent_review",
+  "scope": {
+    "in_scope": 111,
+    "review": 2,
+    "out_of_scope": 7
+  },
+  "records_with_skills": 115,
+  "skill_mentions": 750,
+  "records_with_responsibilities": 120
+}
