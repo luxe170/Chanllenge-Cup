@@ -1,0 +1,301 @@
+{
+  "version": "jd-position-vocabulary-v2",
+  "source": "standardPositionName values in jd_position_ground_truth_100_v2.jsonl",
+  "sampleCount": 100,
+  "positionCount": 28,
+  "positions": [
+    {
+      "id": "gt_pos_05c30320961e",
+      "name": "AI制药算法工程师",
+      "sampleCount": 1,
+      "observedNames": [
+        "CADD专家-AI制药"
+      ]
+    },
+    {
+      "id": "gt_pos_686f66ef3822",
+      "name": "AI基础设施工程师",
+      "sampleCount": 3,
+      "observedNames": [
+        "AI 网络集合通信库运营工程师",
+        "混元大模型Infra稳定性研发工程师(深圳/北京/上海/杭州)",
+        "高性能计算研发工程师-Seed"
+      ]
+    },
+    {
+      "id": "gt_pos_a498e48e0877",
+      "name": "AI应用开发工程师",
+      "sampleCount": 4,
+      "observedNames": [
+        "AI内容营销自动化系统开发",
+        "大模型应用算法工程师(People)-集团信息系统",
+        "日常实习生-业务研发-开发工程师",
+        "理财通AI算法工程师"
+      ]
+    },
+    {
+      "id": "gt_pos_c6aa66f61445",
+      "name": "AI智能体工程师",
+      "sampleCount": 2,
+      "observedNames": [
+        "光子 AI-LLM 高级研究员-游戏智能体方向",
+        "微信小游戏-AI应用开发-游戏内容方向"
+      ]
+    },
+    {
+      "id": "gt_pos_c7d16ea046c9",
+      "name": "AI模型评测工程师",
+      "sampleCount": 2,
+      "observedNames": [
+        "大语言模型评测研究员-Seed",
+        "模型评测实习生"
+      ]
+    },
+    {
+      "id": "gt_pos_46646051f3d3",
+      "name": "AI计算与编译优化工程师",
+      "sampleCount": 5,
+      "observedNames": [
+        "AI异构硬件推理优化专家-Seed",
+        "多模态大模型推理算子优化工程师-Data AML(北京/上海/杭州/深圳)",
+        "推理GPU性能优化专家-Seed",
+        "硬件加速算子编译器工程师-Data",
+        "芯片仿真工程师-Data(北京)"
+      ]
+    },
+    {
+      "id": "gt_pos_cf266d2eddda",
+      "name": "AI质量与测试工程师",
+      "sampleCount": 7,
+      "observedNames": [
+        "AI质量效能负责人 - 飞书",
+        "VR测试开发工程师-移动OS",
+        "图像测试工程师-抖音",
+        "测试/资深测试开发工程师-国际电商物流与供应链",
+        "测试开发Senior Manager-国际化短视频",
+        "资深测试开发工程师-风控方向"
+      ]
+    },
+    {
+      "id": "gt_pos_a9805503e9db",
+      "name": "EHS安全管理专家",
+      "sampleCount": 1,
+      "observedNames": [
+        "实验室安全管理专家-PICO"
+      ]
+    },
+    {
+      "id": "gt_pos_54573325618f",
+      "name": "决策算法工程师",
+      "sampleCount": 1,
+      "observedNames": [
+        "【北斗】AI决策算法研究员(外卖/即时零售方向)"
+      ]
+    },
+    {
+      "id": "gt_pos_77d933980a53",
+      "name": "后端开发工程师",
+      "sampleCount": 2,
+      "observedNames": [
+        "Rust开发工程师-飞书视频会议",
+        "后端开发工程师/专家-Dev Infra"
+      ]
+    },
+    {
+      "id": "gt_pos_178ff61c2435",
+      "name": "大模型算法工程师",
+      "sampleCount": 8,
+      "observedNames": [
+        "AI应用技术Leader-集团信息系统",
+        "【北斗】大模型算法研究员(推理、泛化方向)",
+        "大模型算法工程师(代码质量方向)-Dev Infra",
+        "大语言模型算法工程师-Seed",
+        "大语言模型算法研究专家-Seed",
+        "日常实习生-后训练合版/OPD方向-Qwen基础模型",
+        "日常实习生-大模型训练-未来生活实验室",
+        "研究型实习生-大模型后训练-Accio Work"
+      ]
+    },
+    {
+      "id": "gt_pos_cb341f49a041",
+      "name": "大模型系统工程师",
+      "sampleCount": 4,
+      "observedNames": [
+        "元宝-LLM大模型推理工程师",
+        "大模型推理优化工程师-PICO",
+        "大模型推理框架研发工程师",
+        "日常实习生-大模型推理&训练实习工程师"
+      ]
+    },
+    {
+      "id": "gt_pos_cda21e8912a0",
+      "name": "安全工程师",
+      "sampleCount": 4,
+      "observedNames": [
+        "安全风险管理策略-安全与风控",
+        "情报工程师-Data",
+        "渗透蓝军工程师-安全与风控",
+        "芯片IT安全工程师-芯片研发"
+      ]
+    },
+    {
+      "id": "gt_pos_fd6961d6bdfb",
+      "name": "推荐与广告算法工程师",
+      "sampleCount": 7,
+      "observedNames": [
+        "广告算法专家(Ranking方向)-内容消费",
+        "抖音商城推荐算法工程师-抖音电商",
+        "推荐算法工程师(直播&视频电商)-抖音电商",
+        "推荐算法工程师-国际电商",
+        "推荐算法工程师-抖音电商",
+        "推荐算法高级工程师 - 国际化短视频本地生活",
+        "达人增长算法工程师-国际电商"
+      ]
+    },
+    {
+      "id": "gt_pos_4c2cc6d4dcd0",
+      "name": "搜索算法工程师",
+      "sampleCount": 2,
+      "observedNames": [
+        "算法工程师(搜索)-今日头条"
+      ]
+    },
+    {
+      "id": "gt_pos_13517cd56e7a",
+      "name": "数据库与检索工程师",
+      "sampleCount": 5,
+      "observedNames": [
+        "Elasticsearch高级研发工程师",
+        "云数据库研发工程师 — RDS MySQL",
+        "云数据库研发工程师-RDS MySQL",
+        "分布式数据库内核研发",
+        "研究科学家-基础设施系统实验室(北京/杭州)"
+      ]
+    },
+    {
+      "id": "gt_pos_5d25a1e24a0f",
+      "name": "数据开发工程师",
+      "sampleCount": 1,
+      "observedNames": [
+        "资深数据开发工程师-集团信息系统"
+      ]
+    },
+    {
+      "id": "gt_pos_c23d99409878",
+      "name": "数据挖掘与分析工程师",
+      "sampleCount": 1,
+      "observedNames": [
+        "数据挖掘工程师(ROI方向)-今日头条/番茄小说/红果短剧"
+      ]
+    },
+    {
+      "id": "gt_pos_918395272a17",
+      "name": "数据标注与治理工程师",
+      "sampleCount": 3,
+      "observedNames": [
+        "数据标注运营实习生",
+        "数据生成实习生",
+        "日常实习生-数据智多星-法律方向"
+      ]
+    },
+    {
+      "id": "gt_pos_6710c7c64455",
+      "name": "机器学习平台工程师",
+      "sampleCount": 3,
+      "observedNames": [
+        "AML机器学习平台研发工程师",
+        "模型架构工程师-抖音电商"
+      ]
+    },
+    {
+      "id": "gt_pos_7cfe3c45053c",
+      "name": "游戏开发工程师",
+      "sampleCount": 6,
+      "observedNames": [
+        "J3-UE5微恐射击-后台开发(UE5 DS方向)",
+        "Project T UE5 高级引擎开发",
+        "QQ 经典农场-客户端开发工程师",
+        "QQ 经典农场服务器开发工程师-新星引力计划",
+        "UE5引擎渲染开发工程师(PC主机)",
+        "魔方在研轻动作游戏-客户端开发工程师"
+      ]
+    },
+    {
+      "id": "gt_pos_6bf041d6a38e",
+      "name": "移动系统与多媒体开发工程师",
+      "sampleCount": 8,
+      "observedNames": [
+        "Android Framework开发工程师-移动OS(北京/深圳)",
+        "Camera App开发工程师-移动OS",
+        "Camera驱动开发工程师-移动OS(北京)",
+        "PICO互联工程师(PC方向)-移动OS",
+        "RTC视频工程开发工程师-视频与边缘",
+        "内存优化工程师-移动OS(北京/上海)",
+        "高级NFC软件开发工程师-豆包手机助手",
+        "高级Video软件开发工程师-移动OS(北京/上海)"
+      ]
+    },
+    {
+      "id": "gt_pos_abd2ce939a49",
+      "name": "网络基础设施工程师",
+      "sampleCount": 6,
+      "observedNames": [
+        "Edge POP资源交付经理-基础设施(北京)",
+        "服务器交付专家-基础设施(杭州)",
+        "网络传输协议资深专家-基础架构",
+        "网络资源与交付管理工程师",
+        "网络运营工程师",
+        "资源规划与集成交付-网络计划管理(北京)"
+      ]
+    },
+    {
+      "id": "gt_pos_3dc1aa7054c4",
+      "name": "计算机视觉与多模态算法工程师",
+      "sampleCount": 5,
+      "observedNames": [
+        "内容理解算法工程师-抖音",
+        "多模态算法工程师-抖音内容理解",
+        "大模型算法专家-多模态/代码分析/异常检测",
+        "算法工程师(水印方向)-安全与风控",
+        "算法工程师-电商AIGC视频与图像生成模型方向(T-Star Lab 日常实习)"
+      ]
+    },
+    {
+      "id": "gt_pos_6b08f267d39d",
+      "name": "语音与自然语言处理算法工程师",
+      "sampleCount": 3,
+      "observedNames": [
+        "微信输入法- 语音识别大模型算法研究员/工程师",
+        "算法工程师-自然语言处理(T-Star Lab 日常实习)",
+        "语音算法工程师(多模态理解大模型-说话人方向)-Data语音"
+      ]
+    },
+    {
+      "id": "gt_pos_8edab7a67c1d",
+      "name": "通用算法工程师",
+      "sampleCount": 1,
+      "observedNames": [
+        "资深算法专家-数据智能"
+      ]
+    },
+    {
+      "id": "gt_pos_eb2770690111",
+      "name": "金融投资分析师",
+      "sampleCount": 1,
+      "observedNames": [
+        "投资实习生"
+      ]
+    },
+    {
+      "id": "gt_pos_f8dd75352fbe",
+      "name": "风控算法工程师",
+      "sampleCount": 4,
+      "observedNames": [
+        "信贷风控算法工程师-国际支付",
+        "微信安全-数据算法工程师",
+        "微信支付-高级金融风控数据挖掘工程师",
+        "算法策略工程师-风控"
+      ]
+    }
+  ]
+}

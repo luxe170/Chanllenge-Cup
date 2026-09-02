@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from backend.app.responses import ok
-from src.llm_client import DEFAULT_BASE_URL, DEFAULT_MODEL, llm_config_status, write_llm_config
+from src.llm_client import DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_VISION_MODEL, llm_config_status, write_llm_config
 
 
 router = APIRouter(prefix="/api/v1", tags=["LLM配置"])
@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api/v1", tags=["LLM配置"])
 class LlmConfigRequest(BaseModel):
     apiKey: str = Field(min_length=1)
     model: str = DEFAULT_MODEL
+    visionModel: str = DEFAULT_VISION_MODEL
     baseUrl: str = DEFAULT_BASE_URL
     resumeEnabled: bool = True
 
@@ -25,6 +26,7 @@ def save_llm_config(payload: LlmConfigRequest) -> dict:
     config = write_llm_config(
         payload.apiKey,
         model=payload.model,
+        vision_model=payload.visionModel,
         base_url=payload.baseUrl,
         resume_enabled=payload.resumeEnabled,
     )
@@ -32,6 +34,7 @@ def save_llm_config(payload: LlmConfigRequest) -> dict:
         {
             "configured": config.configured,
             "model": config.model,
+            "visionModel": config.vision_model,
             "baseUrl": config.base_url,
             "resumeEnabled": config.resume_enabled,
         }

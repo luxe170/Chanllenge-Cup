@@ -51,7 +51,20 @@ Ground Truth 的 `result` 必须与后端简历解析接口返回的 `result` �
 
 ## 预测与评分
 
-系统预测保存到 `output/evaluation/resume_predictions_v1.jsonl`，必须覆盖全部 `resume_id`。执行：
+系统预测必须由上传接口所使用的正式任务链路生成：文字版简历走文本 LLM，扫描 PDF
+渲染为页面图片后走多模态 LLM，PNG/JPG/JPEG/WebP 直接作为视觉输入。两条路径最终都归一为同一个
+`result` 结构，因此现有 GT 的核心抽取字段可以继续使用。
+
+先生成预测（正式评测必须加 `--require-llm`，防止规则降级结果混入模型成绩）：
+
+```bash
+python -m src.evaluation.generate_resume_predictions \
+  --manifest data/evaluation/resume/resume_ground_truth_10_v1.jsonl \
+  --output output/evaluation/resume_predictions_10_v1.jsonl \
+  --require-llm
+```
+
+再评分：
 
 ```bash
 python -m src.evaluation.evaluate_resume_predictions \
@@ -67,6 +80,7 @@ python -m src.evaluation.evaluate_resume_predictions \
 - 项目/工作经历的标题归一后包含匹配或相似度不低于0.65，且期间一致，按条目计算micro-F1。
 - 姓名、学历、目标岗位归一后完全匹配；工作年限允许绝对误差不超过0.5年。
 - 解析失败保留为空结果并纳入全部指标的分母，同时单独报告 `parseSuccessRate`。
+- 另外报告 `llmCompletionRate`、`textParseSuccessRate` 和 `visionParseSuccessRate`，用于区分模型降级、文本输入失败和多模态输入失败；这些诊断指标暂不计入综合分。
 - 综合准确率 = 技能F1×35% + 经历F1×20% + 目标岗位准确率×15% + 姓名准确率×10% + 学历准确率×10% + 工作年限准确率×10%。
 - `direction` 是推导展示字段，`completeness` 是资料完整度，两者不参与抽取准确率计算。
 - 开发与正式通过线暂定为90%；只有达到规定样本量并完成人工复核的结果才可称为正式成绩。

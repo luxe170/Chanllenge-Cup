@@ -1,15 +1,12 @@
 import {
-  Bell,
   BookOpenCheck,
   ChartNoAxesCombined,
   ChevronLeft,
   ChevronRight,
-  CircleUserRound,
   FileSearch,
   GitBranch,
   LayoutDashboard,
   Menu,
-  Search,
   Sparkles,
   UserRoundSearch,
 } from 'lucide-react'
@@ -85,15 +82,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <div className="page-heading">
             <span>{current.eyebrow}</span>
             <h1>{current.title}</h1>
-          </div>
-          <div className="topbar-actions">
-            <label className="global-search">
-              <Search size={17} />
-              <input placeholder="搜索岗位、技能或技术栈" />
-              <kbd>⌘ K</kbd>
-            </label>
-            <button className="icon-button notification" aria-label="通知"><Bell size={19} /><i /></button>
-            <button className="user-menu"><CircleUserRound size={22} /><span>评审演示</span></button>
           </div>
         </header>
         <main className="page-content">{children}</main>

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.services.ocr import CallableOcrProvider, NullOcrProvider, OcrError, _extract_text_from_response, set_ocr_provider
 from backend.app.services.resume_service import analyze_resume_text, create_resume_task, get_resume_task, parse_resume_text
-from backend.app.services.resume_text import ResumeTextError, extract_resume_text
+from backend.app.services.resume_text import ResumeTextError, extract_resume_content, extract_resume_text
 
 
 SAMPLE_RESUME = """姓名：陈小雨
@@ -109,6 +109,22 @@ class FakeResumeLlmClient:
                 "confidence": 0.87,
             }
         }
+
+
+class FakeVisionResumeLlmClient(FakeResumeLlmClient):
+    def complete_json_with_images(
+        self,
+        system_prompt: str,
+        user_payload: dict,
+        images: list[bytes],
+        *,
+        mime_type: str = "image/png",
+    ) -> dict:
+        assert "页面图片" in system_prompt
+        assert user_payload["inputMode"] == "vision"
+        assert user_payload["pageCount"] == len(images) == 1
+        assert mime_type == "image/png"
+        return self.complete_json(system_prompt, {"resumeText": "vision"})
 
 
 def test_analyze_resume_text_uses_llm_client_and_returns_learning_suggestions() -> None:
@@ -214,6 +230,26 @@ def test_scanned_pdf_without_ocr_provider_reports_clear_error() -> None:
             extract_resume_text("scanned.pdf", _build_scanned_pdf())
     finally:
         set_ocr_provider(None)
+
+
+def test_scanned_pdf_uses_multimodal_model_without_ocr() -> None:
+    set_ocr_provider(NullOcrProvider())
+    try:
+        prepared = extract_resume_content("scanned.pdf", _build_scanned_pdf(), allow_vision=True)
+        created = create_resume_task(
+            filename="scanned.pdf",
+            content=_build_scanned_pdf(),
+            llm_client=FakeVisionResumeLlmClient(),
+        )
+    finally:
+        set_ocr_provider(None)
+
+    task = get_resume_task(created["taskId"])
+    assert prepared.mode == "vision"
+    assert len(prepared.images) == 1
+    assert task["result"]["analysisSource"] == "llm"
+    assert task["result"]["llmAnalysis"]["inputMode"] == "vision"
+    assert task["result"]["llmAnalysis"]["pageCount"] == 1
 
 
 def test_null_ocr_provider_raises_on_direct_use() -> None:

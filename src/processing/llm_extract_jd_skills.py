@@ -22,6 +22,28 @@ DEFAULT_SPLITS = {
     "jd_test": project_root() / "data" / "processed" / "splits" / "jd_test_set_100.jsonl",
     "holdout": project_root() / "data" / "processed" / "splits" / "jd_holdout_336.jsonl",
 }
+_CUSTOM_POSITION_NAME_MAP: dict[str, str] | None = None
+
+
+def _position_name_map() -> dict[str, str]:
+    return _CUSTOM_POSITION_NAME_MAP or POSITION_NAME_MAP
+
+
+def _load_position_vocabulary(path: Path) -> dict[str, str]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    positions = payload.get("positions")
+    if not isinstance(positions, list) or not positions:
+        raise ValueError("position vocabulary must contain a non-empty positions list")
+    result = {}
+    for item in positions:
+        if not isinstance(item, dict):
+            continue
+        position_id, name = str(item.get("id") or "").strip(), str(item.get("name") or "").strip()
+        if position_id and name:
+            result[position_id] = name
+    if len(result) != len(positions):
+        raise ValueError("every vocabulary position requires a unique id and name")
+    return result
 
 
 def _generated_at() -> str:
@@ -29,7 +51,7 @@ def _generated_at() -> str:
 
 
 def _catalog_prompt() -> str:
-    positions = [{"id": key, "name": value} for key, value in sorted(POSITION_NAME_MAP.items())]
+    positions = [{"id": key, "name": value} for key, value in sorted(_position_name_map().items())]
     skills = [{"id": key, "name": value} for key, value in sorted(SKILL_NAME_MAP.items())]
     return (
         "你是岗位 JD 结构化解析助手。请只基于给定 JD 原文抽取信息，不要编造没有证据的内容。\n"
@@ -89,12 +111,16 @@ def _normalize_position(raw: Any, record: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raw = {}
     position_id = str(raw.get("id") or raw.get("positionId") or raw.get("expectedPositionId") or "")
-    if position_id not in POSITION_NAME_MAP:
-        position_id = _position_for_record(record) if position_id == "candidate_other" else _position_for_record(record)
+    position_names = _position_name_map()
+    if position_id not in position_names:
+        if _CUSTOM_POSITION_NAME_MAP is None:
+            position_id = _position_for_record(record)
+        else:
+            position_id = "candidate_other"
     is_candidate = position_id.startswith("candidate_")
     return {
         "id": position_id,
-        "name": POSITION_NAME_MAP.get(position_id, str(raw.get("name") or record.get("title") or "候选新岗位")),
+        "name": position_names.get(position_id, str(raw.get("name") or record.get("title") or "候选新岗位")),
         "confidence": _clamp_confidence(raw.get("confidence"), 0.55 if is_candidate else 0.75),
         "source": "llm",
         "evidenceText": str(raw.get("evidenceText") or record.get("title") or "")[:240],
@@ -140,12 +166,13 @@ def _normalize_similar_positions(raw_value: Any) -> list[dict[str, Any]]:
         if not isinstance(raw, dict):
             continue
         position_id = str(raw.get("id") or raw.get("positionId") or "")
-        if position_id not in POSITION_NAME_MAP:
+        position_names = _position_name_map()
+        if position_id not in position_names:
             continue
         results.append(
             {
                 "id": position_id,
-                "name": POSITION_NAME_MAP[position_id],
+                "name": position_names[position_id],
                 "confidence": _clamp_confidence(raw.get("confidence"), 0.5),
                 "reason": str(raw.get("reason") or "")[:160],
             }
@@ -373,6 +400,7 @@ def extract_default_splits_with_llm(
 
 
 def main() -> None:
+    global _CUSTOM_POSITION_NAME_MAP
     parser = argparse.ArgumentParser(description="Extract structured JD fields with an LLM-compatible chat API.")
     parser.add_argument("--input", type=Path, default=None)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -384,6 +412,7 @@ def main() -> None:
     parser.add_argument("--splits", default="", help="Comma-separated split names: graph_train,jd_test,holdout.")
     parser.add_argument("--model", default=None)
     parser.add_argument("--base-url", default=None)
+    parser.add_argument("--position-vocabulary", type=Path, help="Optional evaluation-only position vocabulary JSON.")
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--retries", type=int, default=2)
     parser.add_argument("--default-splits", action="store_true", help="Run graph_train, jd_test, and holdout splits.")
@@ -391,6 +420,10 @@ def main() -> None:
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--write-empty", action="store_true", help="Create an empty output without calling an LLM.")
     args = parser.parse_args()
+
+    if args.position_vocabulary is not None:
+        _CUSTOM_POSITION_NAME_MAP = _load_position_vocabulary(args.position_vocabulary)
+        print(f"loaded position vocabulary: {len(_CUSTOM_POSITION_NAME_MAP)} positions", flush=True)
 
     if args.write_empty:
         write_jsonl(args.output, [])

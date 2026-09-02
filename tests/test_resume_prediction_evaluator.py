@@ -45,6 +45,35 @@ class ResumePredictionEvaluatorTest(unittest.TestCase):
         self.assertEqual(report["counts"]["unknownPredictedSkillCount"], 1)
         self.assertEqual(report["metrics"]["skillMicroPrecision"], 0.5)
 
+    def test_accepts_multimodal_api_envelope_and_reports_input_mode(self) -> None:
+        gt = self.root / "gt.jsonl"
+        predictions = self.root / "predictions.jsonl"
+        profile = {
+            "candidateName": "张三",
+            "education": "硕士",
+            "experienceYears": 3,
+            "targetPosition": {"id": "pos_ai"},
+            "skills": [{"id": "skill_python"}],
+        }
+        write_jsonl(
+            gt,
+            [{"resumeId": "R-1", "result": profile, "annotationMeta": {"reviewStatus": "approved"}}],
+        )
+        write_jsonl(
+            predictions,
+            [{
+                "resumeId": "R-1",
+                "data": {"result": {**profile, "analysisSource": "llm", "llmAnalysis": {"status": "completed", "inputMode": "vision"}}},
+            }],
+        )
+
+        report = evaluate_resume_predictions(gt, predictions, self.ontology, allow_draft=True)
+
+        self.assertEqual(report["metrics"]["skillMicroF1"], 1.0)
+        self.assertEqual(report["metrics"]["llmCompletionRate"], 1.0)
+        self.assertEqual(report["metrics"]["visionParseSuccessRate"], 1.0)
+        self.assertEqual(report["counts"]["visionSamples"], 1)
+
     def test_formal_mode_rejects_small_or_unreviewed_ground_truth(self) -> None:
         gt = self.root / "gt.jsonl"
         predictions = self.root / "predictions.jsonl"

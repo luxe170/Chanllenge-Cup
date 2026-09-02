@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 from datetime import datetime, timezone
 
-from backend.app.demo_data import REVIEW_ITEMS, fresh
+from backend.app.demo_data import fresh
 from backend.app.services.data_sources import processed_path, read_jsonl, write_jsonl
 from backend.app.services.evolution_service import (
     SKILL_NAME_MAP,
@@ -132,19 +132,6 @@ def _build_emerging_reviews() -> list[dict]:
     return items
 
 
-def _build_skill_normalization_reviews() -> list[dict]:
-    items = []
-    for item in fresh(REVIEW_ITEMS):
-        if item["type"] != "技能归一":
-            continue
-        item["targetId"] = item.get("targetId", "skill_multi_agent")
-        state = _state_for(item["id"])
-        item["status"] = state["status"]
-        item["note"] = state["note"]
-        items.append(item)
-    return items
-
-
 def get_reviews(status: ReviewStatus | None = None, review_type: ReviewType | None = None, keyword: str = "") -> list[dict]:
     from backend.app.services.pipeline_service import pipeline_reviews
 
@@ -166,7 +153,7 @@ def get_reviews(status: ReviewStatus | None = None, review_type: ReviewType | No
             item["note"] = state["note"]
             items.append(item)
     else:
-        items = _build_emerging_reviews() + _build_change_reviews() + _build_skill_normalization_reviews()
+        items = _build_emerging_reviews() + _build_change_reviews()
     lowered = keyword.strip().lower()
     filtered = []
     for item in pipeline_items + items:

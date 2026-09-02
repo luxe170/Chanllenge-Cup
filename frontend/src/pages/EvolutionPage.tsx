@@ -28,6 +28,7 @@ export default function EvolutionPage() {
   const [evidenceDetails, setEvidenceDetails] = useState<EvidenceDetail[]>([])
   const [evidenceIndex, setEvidenceIndex] = useState(0)
   const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [evidenceMessage, setEvidenceMessage] = useState('')
 
   const [positionProfile, setPositionProfile] = useState<PositionProfile | null>(null)
   const [positionOpen, setPositionOpen] = useState(false)
@@ -72,7 +73,15 @@ export default function EvolutionPage() {
   const selected = useMemo(() => filteredChanges.find((item) => item.id === selectedId) ?? changes[0] ?? null, [changes, filteredChanges, selectedId])
 
   const handleViewEvidence = async () => {
-    if (!selected || !evidence || evidence.evidenceIds.length === 0) return
+    if (!selected || !evidence) {
+      setEvidenceMessage('证据链尚未加载完成，请稍后重试。')
+      return
+    }
+    if (evidence.evidenceIds.length === 0) {
+      setEvidenceMessage('当前变化记录没有可展示的原始证据。')
+      return
+    }
+    setEvidenceMessage('')
     try {
       const results = await Promise.all(evidence.evidenceIds.map((id) => api.getEvidenceDetail(id)))
       setEvidenceDetails(results.map((res) => res.data))
@@ -80,6 +89,7 @@ export default function EvolutionPage() {
       setEvidenceOpen(true)
     } catch {
       setEvidenceOpen(false)
+      setEvidenceMessage('原始证据加载失败，请稍后重试。')
     }
   }
 
@@ -149,6 +159,7 @@ export default function EvolutionPage() {
                   </div>
 
                   <button className="ghost-button full-button" onClick={handleViewEvidence}><FileText size={15} />查看原始证据</button>
+                  {evidenceMessage && <p className="evidence-message">{evidenceMessage}</p>}
                 </>
               ) : (
                 <div className="empty-state">暂无能力变更记录</div>

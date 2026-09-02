@@ -34,13 +34,28 @@ def _id(item: dict[str, Any]) -> str:
 
 
 def _profile(item: dict[str, Any], ground_truth: bool = False) -> dict[str, Any]:
-    if ground_truth:
-        return item.get("result") or item.get("annotation") or {}
-    if "prediction" in item:
-        return item.get("prediction") or {}
-    if "result" in item:
-        return item.get("result") or {}
-    return item
+    current: Any = item
+    # Accept stored prediction rows, API envelopes ({data:{result:{...}}}), task
+    # payloads ({result:{...}}), and raw multimodal model payloads ({profile:{...}}).
+    keys = ("result", "annotation") if ground_truth else ("data", "prediction", "result", "profile")
+    for _ in range(5):
+        if not isinstance(current, dict):
+            return {}
+        next_value = next((current.get(key) for key in keys if isinstance(current.get(key), dict)), None)
+        if next_value is None:
+            return current
+        current = next_value
+    return current if isinstance(current, dict) else {}
+
+
+def _prediction_meta(item: dict[str, Any], profile: dict[str, Any]) -> dict[str, str]:
+    meta = item.get("predictionMeta") or item.get("prediction_meta") or {}
+    analysis = profile.get("llmAnalysis") or {}
+    return {
+        "analysisSource": str(meta.get("analysisSource") or profile.get("analysisSource") or "unknown"),
+        "inputMode": str(meta.get("inputMode") or analysis.get("inputMode") or "text"),
+        "analysisStatus": str(analysis.get("status") or ("completed" if profile else "failed")),
+    }
 
 
 def _text(value: Any) -> str:
@@ -129,6 +144,7 @@ def evaluate_resume_predictions(
     allow_draft: bool = False,
     allow_pending_aliases: bool = False,
     threshold: float = 0.90,
+    adjudications_path: Path | None = None,
 ) -> dict[str, Any]:
     ontology = Ontology(ontology_dir, ontology_version, allow_pending_aliases)
     production_catalog = _build_skill_catalog()
@@ -136,6 +152,8 @@ def evaluate_resume_predictions(
     production_names = {_text(skill.name): skill.id for skill in production_catalog}
     ground_truth = read_jsonl(ground_truth_path)
     predictions = read_jsonl(predictions_path)
+    adjudications = json.loads(adjudications_path.read_text(encoding="utf-8")) if adjudications_path else {}
+    resume_adjudications = adjudications.get("resumes") or {}
     if len(ground_truth) < 30 and not allow_draft:
         raise ValueError(f"formal resume evaluation requires at least 30 records, got {len(ground_truth)}")
 
@@ -161,6 +179,8 @@ def evaluate_resume_predictions(
         "unknownPredictedSkillCount": 0,
         "experienceTruePositive": 0, "experienceFalsePositive": 0, "experienceFalseNegative": 0,
         "parseSuccess": 0,
+        "llmCompleted": 0, "textSamples": 0, "textParseSuccess": 0,
+        "visionSamples": 0, "visionParseSuccess": 0,
     }
     errors: list[dict[str, Any]] = []
 
@@ -168,9 +188,44 @@ def evaluate_resume_predictions(
         identifier = _id(gt_item)
         expected = _profile(gt_item, True)
         predicted = _profile(prediction_map[identifier])
-        counts["parseSuccess"] += int(bool(predicted))
+        prediction_meta = _prediction_meta(prediction_map[identifier], predicted)
+        parse_ok = bool(predicted)
+        input_mode = "vision" if prediction_meta["inputMode"] == "vision" else "text"
+        counts["parseSuccess"] += int(parse_ok)
+        counts["llmCompleted"] += int(
+            prediction_meta["analysisSource"] == "llm" and prediction_meta["analysisStatus"] == "completed"
+        )
+        counts[f"{input_mode}Samples"] += 1
+        counts[f"{input_mode}ParseSuccess"] += int(parse_ok)
         expected_skills, _ = _skills(expected, ontology, production_ids, production_names, ground_truth=True)
         predicted_skills, unknown = _skills(predicted, ontology, production_ids, production_names, ground_truth=False)
+        review = resume_adjudications.get(identifier) or {}
+        rejected_gt_names = {_text(name) for name in review.get("removeGroundTruthSkills") or []}
+        for skill in expected.get("skills") or []:
+            name = skill.get("name") if isinstance(skill, dict) else skill
+            if _text(name) not in rejected_gt_names:
+                continue
+            resolved = ontology.resolve_skill(skill)
+            if resolved.entity_id:
+                expected_skills.discard(resolved.entity_id)
+            elif isinstance(skill, dict) and str(skill.get("id") or "") in production_ids:
+                expected_skills.discard(f"production:{skill['id']}")
+
+        accepted_names = {_text(name) for name in review.get("acceptedAdditionalSkills") or []}
+        accepted_unknown = {name: f"reviewed:{name}" for name in accepted_names}
+        for name in review.get("acceptedAdditionalSkills") or []:
+            key = _text(name)
+            resolved = ontology.resolve_skill(name)
+            production_id = production_names.get(key)
+            expected_skills.add(resolved.entity_id or (f"production:{production_id}" if production_id else accepted_unknown[key]))
+        retained_unknown: list[str] = []
+        for name in unknown:
+            key = _text(name)
+            if key in accepted_names:
+                predicted_skills.add(accepted_unknown[key])
+            else:
+                retained_unknown.append(name)
+        unknown = retained_unknown
         common = expected_skills & predicted_skills
         missing = expected_skills - predicted_skills
         extra = predicted_skills - expected_skills
@@ -189,6 +244,10 @@ def evaluate_resume_predictions(
         predicted_years = float(predicted.get("experience_years") if predicted.get("experience_years") is not None else predicted.get("experienceYears") or 0)
         years_ok = abs(expected_years - predicted_years) <= 0.5
         position_ok = _position(expected, ontology) == _position(predicted, ontology)
+        if not position_ok:
+            accepted_positions = {_text(name) for name in review.get("acceptedPositionNames") or []}
+            predicted_position = predicted.get("target_position") or predicted.get("targetPosition") or predicted.get("position") or ""
+            position_ok = _text(predicted_position) in accepted_positions
         for key, ok in (("nameCorrect", name_ok), ("educationCorrect", education_ok), ("experienceYearsCorrect", years_ok), ("targetPositionCorrect", position_ok)):
             counts[key] += int(ok)
 
@@ -226,6 +285,9 @@ def evaluate_resume_predictions(
         "experienceYearsAccuracy": round(years_accuracy, 4),
         "targetPositionAccuracy": round(position_accuracy, 4),
         "parseSuccessRate": round(safe_ratio(counts["parseSuccess"], sample_count), 4),
+        "llmCompletionRate": round(safe_ratio(counts["llmCompleted"], sample_count), 4),
+        "textParseSuccessRate": round(safe_ratio(counts["textParseSuccess"], counts["textSamples"]), 4),
+        "visionParseSuccessRate": round(safe_ratio(counts["visionParseSuccess"], counts["visionSamples"]), 4),
         "overallScore": round(overall_score, 4),
     }
     report = {
@@ -234,6 +296,7 @@ def evaluate_resume_predictions(
         "sampleCount": sample_count,
         "groundTruthSha256": file_sha256(ground_truth_path),
         "predictionsSha256": file_sha256(predictions_path),
+        "adjudicationsSha256": file_sha256(adjudications_path) if adjudications_path else None,
         "ontologyVersion": ontology_version,
         "metrics": metrics,
         "counts": counts,
@@ -250,6 +313,7 @@ def main() -> None:
     parser.add_argument("--predictions", type=Path, default=DEFAULT_PREDICTIONS)
     parser.add_argument("--ontology-dir", type=Path, default=DEFAULT_ONTOLOGY)
     parser.add_argument("--ontology-version", default="v1")
+    parser.add_argument("--adjudications", type=Path)
     parser.add_argument("--output", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--threshold", type=float, default=0.90)
     parser.add_argument("--allow-draft", action="store_true")
@@ -258,6 +322,7 @@ def main() -> None:
     report = evaluate_resume_predictions(
         args.ground_truth, args.predictions, args.ontology_dir, args.ontology_version,
         allow_draft=args.allow_draft, allow_pending_aliases=args.allow_pending_aliases, threshold=args.threshold,
+        adjudications_path=args.adjudications,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

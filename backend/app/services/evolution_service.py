@@ -389,8 +389,6 @@ def _build_snapshot_windows() -> tuple[Dict[str, Dict[str, Dict[str, Any]]], Dic
     baseline_count = _baseline_record_count()
     if baseline_count is not None:
         historical, current = _partition_at_baseline(records)
-        if not current:
-            historical, current = _partition_at_midpoint(records)
     else:
         historical, current = _partition_at_midpoint(records)
 
@@ -582,7 +580,10 @@ def compute_change_evidence(change_id: str) -> dict:
 
     position_id = matched.positionId
     skill_id = matched.skillId
-    _, records = _partition_at_baseline(_load_job_records())
+    all_records = _load_job_records()
+    _, records = _partition_at_baseline(all_records)
+    if not records and all_records:
+        _, records = _partition_at_midpoint(all_records)
     hits = [
         (idx, record)
         for idx, record in enumerate(records)
@@ -658,7 +659,7 @@ def compute_evidence_detail(evidence_id: str) -> dict:
 def compute_emerging_positions(page: int = 1, page_size: int = 20, keyword: str = "") -> dict:
     all_records = _load_job_records()
     _, records = _partition_at_baseline(all_records)
-    if not records and all_records:
+    if _baseline_record_count() is None and not records and all_records:
         records = all_records
     if not records:
         return {"items": [], "total": 0, "page": page, "pageSize": page_size}

@@ -323,6 +323,18 @@ export interface MatchReport {
   }
   suggestions: string[]
   learningPath: LearningStep[]
+  guidanceSource?: 'llm' | 'deterministic_fallback'
+  skillAlignment?: SkillAlignment[]
+}
+
+export interface SkillAlignment {
+  rawName: string
+  standardSkillId: string
+  standardSkillName: string
+  level: string
+  confidence: number
+  reason?: string
+  source: 'llm' | 'deterministic_fallback'
 }
 
 export interface MatchRankingItem {
@@ -341,6 +353,7 @@ export interface MatchRanking {
   bestPositionId: string
   bestPositionName: string
   bestScore: number
+  skillAlignment?: SkillAlignment[]
   items: MatchRankingItem[]
 }
 

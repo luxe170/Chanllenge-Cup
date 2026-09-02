@@ -238,12 +238,6 @@ export default function GraphPage() {
               {searchItems.map((item) => <button key={item.id} onClick={() => focusNode(item.id)}>{cleanName(item.name)}<em>{item.type}</em></button>)}
             </div>
           )}
-          {searchItems.length === 0 && mode === 'skill_reverse' && (
-            <div className="reverse-skill-list">
-              <span>技能反查入口</span>
-              {roots.slice(0, 3).map((root, index) => <button className={index === 0 ? 'active' : ''} key={root.id} onClick={() => focusNode(root.id)}>{cleanName(root.name)}<em>{root.nodeCount} 个节点</em></button>)}
-            </div>
-          )}
         </aside>
 
         <section className="graph-canvas">

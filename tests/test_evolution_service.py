@@ -11,12 +11,11 @@ from backend.app.services.evolution_service import (
 
 
 class EvolutionServiceTest(unittest.TestCase):
-    def test_returns_realistic_change_set_from_processed_jobs(self):
+    def test_initial_graph_baseline_has_no_evolution_changes(self):
         payload = compute_evolution_changes(page=1, page_size=20)
 
-        self.assertGreater(payload["total"], 10)
-        self.assertGreater(len(payload["items"]), 0)
-        self.assertTrue(all(item.evidenceCount > 0 for item in payload["items"]))
+        self.assertEqual(payload["total"], 0)
+        self.assertEqual(payload["items"], [])
 
     def test_returns_evidence_detail_for_real_jd_record(self):
         payload = compute_evidence_detail("jd_0001")
@@ -47,7 +46,9 @@ class EvolutionServiceTest(unittest.TestCase):
             }
             for index in range(5)
         ]
-        with patch("backend.app.services.evolution_service._load_job_records", return_value=records):
+        with patch("backend.app.services.evolution_service._load_job_records", return_value=records), patch(
+            "backend.app.services.evolution_service._baseline_record_count", return_value=None
+        ):
             payload = compute_emerging_positions()
         self.assertEqual(payload["total"], 0)
 
@@ -64,7 +65,9 @@ class EvolutionServiceTest(unittest.TestCase):
             }
             for index in range(3)
         ]
-        with patch("backend.app.services.evolution_service._load_job_records", return_value=records):
+        with patch("backend.app.services.evolution_service._load_job_records", return_value=records), patch(
+            "backend.app.services.evolution_service._baseline_record_count", return_value=None
+        ):
             payload = compute_emerging_positions()
         self.assertEqual(payload["total"], 1)
         self.assertEqual(payload["items"][0].name, "具身智能数据工程师")

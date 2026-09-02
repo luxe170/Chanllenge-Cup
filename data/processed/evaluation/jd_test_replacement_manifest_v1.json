@@ -1,0 +1,151 @@
+{
+  "version": "first-version-test-v2-no-graph-overlap",
+  "generatedAt": "2026-09-02T05:21:02Z",
+  "testCount": 100,
+  "removed": [
+    {
+      "sourceId": "bytedance:7095579319473031460",
+      "title": "数据挖掘工程师-今日头条"
+    },
+    {
+      "sourceId": "bytedance:7307185124781050163",
+      "title": "推荐算法工程师(商城)-抖音电商"
+    },
+    {
+      "sourceId": "bytedance:7372477324837619995",
+      "title": "NLP算法工程师-抖音AI分身"
+    },
+    {
+      "sourceId": "bytedance:7525452956260108552",
+      "title": "AML机器学习系统SRE工程师-火山引擎"
+    },
+    {
+      "sourceId": "bytedance:7473060281036998919",
+      "title": "网络研发工程师-监控告警方向"
+    },
+    {
+      "sourceId": "bytedance:7583908774726682885",
+      "title": "骨干网络运维工程师-Data"
+    },
+    {
+      "sourceId": "bytedance:7418126735743863049",
+      "title": "数据开发工程师"
+    },
+    {
+      "sourceId": "bytedance:7509043201409304850",
+      "title": "RISC-V生态建设工程师-基础库与工具链"
+    },
+    {
+      "sourceId": "bytedance:7611375540486261045",
+      "title": "硬件加速模型编译优化工程师-Data"
+    },
+    {
+      "sourceId": "tencent_careers:2072330943372378112",
+      "title": "腾讯游戏-大模型推理性能优化工程师/专家"
+    },
+    {
+      "sourceId": "bytedance:7263015220867041573",
+      "title": "大模型应用算法工程师-剪映CapCut"
+    },
+    {
+      "sourceId": "bytedance:7472688983866657042",
+      "title": "大语言模型算法工程师-豆包大模型"
+    },
+    {
+      "sourceId": "bytedance:6990223491325217055",
+      "title": "测试开发工程师(算法工程)-国际化内容安全平台"
+    },
+    {
+      "sourceId": "bytedance:7083469905640081700",
+      "title": "高级测试开发工程师-抖音搜索"
+    },
+    {
+      "sourceId": "bytedance:7361731296215746826",
+      "title": "数据库AI测试开发高级工程师-基础设施"
+    },
+    {
+      "sourceId": "bytedance:6989438276164323621",
+      "title": "推荐算法工程师-火山引擎"
+    },
+    {
+      "sourceId": "bytedance:7088150574206257416",
+      "title": "营销算法工程师-生活服务"
+    }
+  ],
+  "added": [
+    {
+      "sourceId": "bytedance:7623304135925090565",
+      "title": "算法工程师(搜索)-今日头条"
+    },
+    {
+      "sourceId": "tencent_careers:2037101976877170688",
+      "title": "大模型推理框架研发工程师"
+    },
+    {
+      "sourceId": "alibaba_campus:199906700003",
+      "title": "AI内容营销自动化系统开发"
+    },
+    {
+      "sourceId": "meituan_careers:4530913541",
+      "title": "【北斗】大模型算法研究员(推理、泛化方向)"
+    },
+    {
+      "sourceId": "bytedance:7621535059103303989",
+      "title": "达人增长算法工程师-国际电商"
+    },
+    {
+      "sourceId": "tencent_careers:1932983235067904000",
+      "title": "网络运营工程师"
+    },
+    {
+      "sourceId": "alibaba_campus:199907880001",
+      "title": "日常实习生-大模型推理&训练实习工程师"
+    },
+    {
+      "sourceId": "bytedance:7491665085673720071",
+      "title": "推荐算法工程师-国际电商"
+    },
+    {
+      "sourceId": "tencent_careers:2076924809798922240",
+      "title": "理财通AI算法工程师"
+    },
+    {
+      "sourceId": "alibaba_campus:199904260008",
+      "title": "日常实习生-数据智多星-法律方向"
+    },
+    {
+      "sourceId": "bytedance:7525465167627782408",
+      "title": "推荐算法工程师(直播&视频电商)-抖音电商"
+    },
+    {
+      "sourceId": "tencent_careers:1902190189934100480",
+      "title": "元宝-LLM大模型推理工程师"
+    },
+    {
+      "sourceId": "alibaba_campus:199905160003",
+      "title": "数据生成实习生"
+    },
+    {
+      "sourceId": "bytedance:7514636368456599826",
+      "title": "广告算法专家(Ranking方向)-内容消费"
+    },
+    {
+      "sourceId": "tencent_careers:2054521545946214400",
+      "title": "微信支付-高级金融风控数据挖掘工程师"
+    },
+    {
+      "sourceId": "alibaba_campus:199907980002",
+      "title": "日常实习生-后训练合版/OPD方向-Qwen基础模型"
+    },
+    {
+      "sourceId": "bytedance:7628921421481232645",
+      "title": "模型架构工程师-抖音电商"
+    }
+  ],
+  "validation": {
+    "sourceIdOverlap": 0,
+    "contentHashOverlap": 0,
+    "normalizedTextOverlap": 0,
+    "internalNormalizedTextDuplicates": 3
+  }
+}
