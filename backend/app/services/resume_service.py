@@ -11,16 +11,19 @@ from typing import Any
 from backend.app.demo_data import PANORAMA_NODES, RESUME_TASK, SKILL_REVERSE_NODES, fresh
 from backend.app.services.data_sources import processed_path, read_jsonl
 from backend.app.services.evolution_service import SKILL_ALIASES, SKILL_NAME_MAP
+from backend.app.services.resume_llm_service import analyze_resume_with_llm, build_rule_learning_suggestions
 from backend.app.services.resume_text import ResumeTextError, extract_resume_text
+from src.llm_client import ChatCompletionsClient, JsonChatClient, load_llm_config
 
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-PROFICIENCY_LEVELS = ("熟悉", "掌握", "精通")
+PROFICIENCY_LEVELS = ("了解", "熟悉", "掌握", "精通")
 
 PROFICIENCY_MARKERS = {
     "精通": ("精通", "expert", "深入", "主导", "负责核心", "专家"),
     "掌握": ("掌握", "熟练", "熟练掌握", "proficient", "advanced", "独立"),
-    "熟悉": ("熟悉", "了解", "familiar", "basic", "基础", "参与"),
+    "熟悉": ("熟悉", "familiar", "基础", "参与"),
+    "了解": ("了解", "入门", "basic", "课程", "学习"),
 }
 
 FALLBACK_SKILL_ALIASES = {
@@ -104,7 +107,7 @@ class ResumeTaskStore:
         self._tasks: dict[str, ResumeTask] = {}
         self._lock = threading.Lock()
 
-    def create(self, filename: str = "", content: bytes = b"") -> ResumeTask:
+    def create(self, filename: str = "", content: bytes = b"", llm_client: JsonChatClient | None = None) -> ResumeTask:
         task_id = f"resume_{uuid.uuid4().hex[:10]}"
         now = _now()
         if not content:
@@ -137,7 +140,7 @@ class ResumeTaskStore:
 
         text = extract_resume_text(task.filename, content)
         task.progress = 65
-        task.result = parse_resume_text(task.filename, text)
+        task.result = analyze_resume_text(task.filename, text, llm_client=llm_client)
         task.status = "completed"
         task.progress = 100
         task.updatedAt = _now()
@@ -170,21 +173,28 @@ class ResumeTaskStore:
                 return None
             current = _current_skills(task)
             if removed:
-                remove_set = {item.casefold() for item in removed}
+                remove_set = {
+                    key
+                    for item in removed
+                    for key in _skill_identity_keys({"id": item, "name": item})
+                }
                 current = [
                     item
                     for item in current
-                    if str(item.get("id", "")).casefold() not in remove_set
-                    and str(item.get("name", "")).casefold() not in remove_set
+                    if not _skill_identity_keys(item) & remove_set
                 ]
             if updated:
                 for change in updated:
-                    key = str(change.get("id") or change.get("name") or "").casefold()
-                    if not key:
+                    keys = _skill_identity_keys(change)
+                    if not keys:
                         continue
                     for item in current:
-                        if key in {str(item.get("id", "")).casefold(), str(item.get("name", "")).casefold()}:
-                            item.update({k: v for k, v in change.items() if k in {"id", "name", "level", "source", "confidence"}})
+                        if _skill_identity_keys(item) & keys:
+                            item.update(
+                                _normalize_skill_payload(
+                                    {**item, **{k: v for k, v in change.items() if k in {"id", "name", "level", "source", "confidence"}}}
+                                )
+                            )
                             break
             if added:
                 existing = {
@@ -250,6 +260,37 @@ def _normalize_skill_payload(skill: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _canonical_skill_definition(skill: dict[str, Any]) -> SkillDefinition | None:
+    values = [
+        str(skill.get("id") or "").strip(),
+        str(skill.get("skillId") or "").strip(),
+        str(skill.get("name") or "").strip(),
+    ]
+    lookup = {value.casefold() for value in values if value}
+    if not lookup:
+        return None
+    for definition in _build_skill_catalog():
+        candidates = {definition.id.casefold(), definition.name.casefold()}
+        candidates.update(alias.casefold() for alias in definition.aliases if alias)
+        if lookup & candidates:
+            return definition
+    return None
+
+
+def _skill_identity_keys(skill: dict[str, Any]) -> set[str]:
+    keys = {
+        str(value).casefold()
+        for value in (skill.get("id"), skill.get("skillId"), skill.get("name"))
+        if value
+    }
+    definition = _canonical_skill_definition(skill)
+    if definition:
+        keys.add(definition.id.casefold())
+        keys.add(definition.name.casefold())
+        keys.update(alias.casefold() for alias in definition.aliases if alias)
+    return keys
+
+
 def _build_skill_catalog() -> list[SkillDefinition]:
     by_id: dict[str, SkillDefinition] = {}
     by_name: dict[str, str] = {}
@@ -308,7 +349,7 @@ def _line_context(text: str, match: re.Match[str]) -> str:
 
 def _detect_level(context: str) -> str:
     folded = context.casefold()
-    for level in ("精通", "掌握", "熟悉"):
+    for level in ("精通", "掌握", "熟悉", "了解"):
         if any(marker.casefold() in folded for marker in PROFICIENCY_MARKERS[level]):
             return level
     return "掌握"
@@ -488,12 +529,89 @@ def parse_resume_text(filename: str, text: str) -> dict[str, Any]:
         "experiences": experiences,
     }
     profile["completeness"] = _completeness(profile)
+    profile["learningSuggestions"] = build_rule_learning_suggestions(profile)
+    profile["resumeOptimizationSuggestions"] = _rule_resume_optimization_suggestions(profile)
+    profile["abilityProfile"] = _rule_ability_profile(profile)
+    profile["analysisSource"] = "rule"
+    profile["llmAnalysis"] = {"enabled": False, "status": "not_enabled"}
     return profile
 
 
-def create_resume_task(filename: str = "", content: bytes = b"") -> dict:
+def _rule_ability_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    skills = [skill.get("name") for skill in profile.get("skills", []) if isinstance(skill, dict)]
+    experiences = profile.get("experiences", [])
+    strengths = skills[:5]
+    weaknesses = []
+    if len(skills) < 4:
+        weaknesses.append("技能证据偏少")
+    if len(experiences) < 2:
+        weaknesses.append("项目或实习经历证据不足")
+    if profile.get("targetPosition") == "待选择目标岗位":
+        weaknesses.append("目标岗位不明确")
+    return {
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "projectEvidenceLevel": "较充分" if len(experiences) >= 2 else "待补充",
+        "engineeringMaturity": "可从项目经历进一步判断" if experiences else "证据不足",
+        "targetRelevance": "已识别目标岗位" if profile.get("targetPosition") != "待选择目标岗位" else "待选择目标岗位",
+        "riskNotes": weaknesses,
+        "summary": profile.get("summary", ""),
+    }
+
+
+def _rule_resume_optimization_suggestions(profile: dict[str, Any]) -> list[str]:
+    suggestions = []
+    if profile.get("targetPosition") == "待选择目标岗位":
+        suggestions.append("补充明确的求职意向或目标岗位，方便系统做更稳定的人岗匹配。")
+    if len(profile.get("experiences", [])) < 2:
+        suggestions.append("补充项目经历中的个人贡献、技术难点和量化结果。")
+    if len(profile.get("skills", [])) < 4:
+        suggestions.append("为核心技能补充上下文证据，避免只有关键词列表。")
+    return suggestions or ["简历结构较完整，建议继续补充可量化项目成果。"]
+
+
+def _resume_llm_enabled() -> bool:
+    return load_llm_config().resume_enabled
+
+
+def analyze_resume_text(
+    filename: str,
+    text: str,
+    *,
+    llm_client: JsonChatClient | None = None,
+) -> dict[str, Any]:
+    rule_profile = parse_resume_text(filename, text)
+    if llm_client is None and not _resume_llm_enabled():
+        return rule_profile
+
     try:
-        task = _store.create(filename, content)
+        client = llm_client or ChatCompletionsClient.from_env()
+        profile = analyze_resume_with_llm(filename, text, client, fallback_profile=rule_profile)
+        profile["llmAnalysis"] = {
+            "enabled": True,
+            "status": "completed",
+            "model": client.model,
+            "fallbackSource": "rule",
+        }
+        return profile
+    except Exception as exc:
+        rule_profile["llmAnalysis"] = {
+            "enabled": True,
+            "status": "degraded",
+            "error": str(exc),
+            "fallbackSource": "rule",
+        }
+        return rule_profile
+
+
+def create_resume_task(
+    filename: str = "",
+    content: bytes = b"",
+    *,
+    llm_client: JsonChatClient | None = None,
+) -> dict:
+    try:
+        task = _store.create(filename, content, llm_client=llm_client)
     except ResumeTextError as exc:
         raise ValueError(str(exc)) from exc
     return {"taskId": task.taskId, "status": task.status, "progress": task.progress}

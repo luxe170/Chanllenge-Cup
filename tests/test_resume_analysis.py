@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.main import app
 from backend.app.services.ocr import CallableOcrProvider, NullOcrProvider, OcrError, _extract_text_from_response, set_ocr_provider
-from backend.app.services.resume_service import parse_resume_text
+from backend.app.services.resume_service import analyze_resume_text, create_resume_task, get_resume_task, parse_resume_text
 from backend.app.services.resume_text import ResumeTextError, extract_resume_text
 
 
@@ -41,6 +41,96 @@ def test_parse_resume_text_links_skills_to_graph_catalog() -> None:
     assert skills["Python"]["level"] == "精通"
     assert skills["云原生"]["id"] == "skill_cloud_native"
     assert profile["experiences"]
+    assert profile["analysisSource"] == "rule"
+    assert profile["learningSuggestions"]
+    assert profile["resumeOptimizationSuggestions"]
+
+
+class FakeResumeLlmClient:
+    model = "fake-resume-llm"
+
+    def complete_json(self, system_prompt: str, user_payload: dict) -> dict:
+        assert "简历分析与学习建议助手" in system_prompt
+        assert "resumeText" in user_payload
+        return {
+            "profile": {
+                "candidateName": "陈小雨",
+                "targetPosition": "AI Agent 研发工程师",
+                "education": "硕士 · 计算机科学",
+                "experienceYears": 3,
+                "direction": "AI 应用工程方向",
+                "summary": "具备 RAG 和智能体应用项目经验",
+                "skills": [
+                    {
+                        "id": "skill_python",
+                        "name": "Python",
+                        "level": "精通",
+                        "evidenceText": "精通 Python",
+                        "confidence": 0.92,
+                    },
+                    {
+                        "id": "skill_rag",
+                        "name": "RAG",
+                        "level": "掌握",
+                        "evidenceText": "负责 RAG 链路",
+                        "confidence": 0.9,
+                    },
+                ],
+                "experiences": [
+                    {
+                        "period": "2025.03 - 至今",
+                        "title": "企业知识库智能问答系统",
+                        "description": "负责 RAG 链路、向量检索与模型服务化",
+                        "skills": ["RAG", "Python"],
+                        "confidence": 0.88,
+                    }
+                ],
+                "abilityProfile": {
+                    "strengths": ["RAG 工程落地"],
+                    "weaknesses": ["多智能体协作证据不足"],
+                    "projectEvidenceLevel": "较充分",
+                    "engineeringMaturity": "具备独立模块交付经验",
+                    "targetRelevance": "较高",
+                },
+                "learningSuggestions": [
+                    {
+                        "stage": 1,
+                        "category": "短期补齐",
+                        "priority": "高",
+                        "title": "补齐多智能体协作证据",
+                        "reason": "目标岗位需要 Agent 编排能力",
+                        "duration": "1-2 周",
+                        "skills": ["多智能体协作"],
+                        "actions": ["完成工具调用工作流 Demo"],
+                        "expectedOutcome": "形成可演示项目证据",
+                    }
+                ],
+                "resumeOptimizationSuggestions": ["补充智能体项目的量化指标"],
+                "confidence": 0.87,
+            }
+        }
+
+
+def test_analyze_resume_text_uses_llm_client_and_returns_learning_suggestions() -> None:
+    profile = analyze_resume_text("陈小雨_简历.txt", SAMPLE_RESUME, llm_client=FakeResumeLlmClient())
+
+    assert profile["analysisSource"] == "llm"
+    assert profile["llmAnalysis"]["status"] == "completed"
+    assert profile["skills"][0]["id"] == "skill_python"
+    assert profile["abilityProfile"]["strengths"] == ["RAG 工程落地"]
+    assert profile["learningSuggestions"][0]["title"] == "补齐多智能体协作证据"
+
+
+def test_create_resume_task_accepts_injected_llm_client() -> None:
+    created = create_resume_task(
+        filename="resume.txt",
+        content=SAMPLE_RESUME.encode("utf-8"),
+        llm_client=FakeResumeLlmClient(),
+    )
+    task = get_resume_task(created["taskId"])
+
+    assert task["result"]["analysisSource"] == "llm"
+    assert task["result"]["llmAnalysis"]["model"] == "fake-resume-llm"
 
 
 def test_resume_task_lifecycle_supports_upload_and_delta_skill_patch() -> None:

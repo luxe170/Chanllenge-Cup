@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.responses import ok
-from backend.app.routers import batches, dashboard, data, graph, matches, resume, reviews
+from backend.app.routers import batches, dashboard, data, graph, llm, matches, resume, reviews
 from backend.app.services.evolution_service import (
     compute_change_evidence,
     compute_evolution_changes,
@@ -52,6 +52,7 @@ app.add_middleware(
 app.include_router(dashboard.router)
 app.include_router(data.router)
 app.include_router(graph.router)
+app.include_router(llm.router)
 app.include_router(reviews.router)
 app.include_router(resume.router)
 app.include_router(matches.router)

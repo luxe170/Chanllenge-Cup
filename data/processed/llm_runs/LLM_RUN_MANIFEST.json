@@ -1,0 +1,28 @@
+{
+  "runLabel": "LLM runs",
+  "generatedAt": "2026-09-01T08:44:44Z",
+  "llmConfig": {
+    "configured": true,
+    "model": "deepseek-v4-flash",
+    "baseUrl": "https://api.deepseek.com",
+    "resumeEnabled": true
+  },
+  "outputs": {
+    "extractionPredictions": "D:\\挑战杯func2\\挑战杯\\挑战杯\\data\\processed\\extractions\\llm_jd_extraction_predictions.jsonl",
+    "testPredictions": "D:\\挑战杯func2\\挑战杯\\挑战杯\\data\\processed\\evaluation\\llm_jd_test_predictions.jsonl",
+    "graphNodes": "D:\\挑战杯func2\\挑战杯\\挑战杯\\data\\processed\\llm_runs\\graph_nodes.jsonl",
+    "graphEdges": "D:\\挑战杯func2\\挑战杯\\挑战杯\\data\\processed\\llm_runs\\graph_edges.jsonl",
+    "evaluationReport": "D:\\挑战杯func2\\挑战杯\\挑战杯\\data\\processed\\llm_runs\\llm_jd_evaluation_report.json"
+  },
+  "counts": {
+    "predictionCount": 300,
+    "graphNodeCount": 88,
+    "graphEdgeCount": 307,
+    "evaluatedCount": 100
+  },
+  "metrics": {
+    "overallAccuracy": 0.788,
+    "positionAccuracy": 0.74,
+    "skillF1": 0.836
+  }
+}

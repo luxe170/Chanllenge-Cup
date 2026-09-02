@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from backend.app.services.data_sources import read_jsonl, write_jsonl
 from backend.app.services.evolution_service import (
     POSITION_NAME_MAP,
-    SKILL_ALIASES,
     SKILL_NAME_MAP,
     _load_job_records,
-    _match_aliases,
-    _record_text,
+)
+from src.processing.extract_jd_predictions import (
+    extract_predictions,
 )
 
 
@@ -62,15 +62,62 @@ SKILL_CLUSTER_MAP = {
 
 
 def _first_seen(records: list[dict[str, Any]]) -> str:
-    values = [record.get("publish_time", "")[:10] for record in records if record.get("publish_time")]
+    values = [
+        str(record.get("publish_time") or record.get("publishTime") or "")[:10]
+        for record in records
+        if record.get("publish_time") or record.get("publishTime")
+    ]
     return min(values) if values else ""
 
 
-def build_graph_seed(input_path: Path | str | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    records = _load_job_records(input_path)
+def _prediction_position_id(prediction: dict[str, Any]) -> str:
+    return str(
+        prediction.get("positionId")
+        or prediction.get("predictedPositionId")
+        or (prediction.get("position") or {}).get("id")
+        or ""
+    )
+
+
+def _prediction_skill_ids(prediction: dict[str, Any]) -> list[str]:
+    skills = prediction.get("skills") or prediction.get("predictedSkills") or []
+    if not isinstance(skills, list):
+        return []
+    result = []
+    for skill in skills:
+        if isinstance(skill, dict) and skill.get("id"):
+            result.append(str(skill["id"]))
+    return sorted(set(result))
+
+
+def _split_for_path(input_path: Path | str | None) -> str:
+    if input_path is None:
+        return ""
+    name = Path(input_path).name
+    if name.startswith("graph_train"):
+        return "graph_train"
+    if name.startswith("jd_test"):
+        return "jd_test"
+    if name.startswith("jd_holdout"):
+        return "holdout"
+    return ""
+
+
+def build_graph_seed(
+    input_path: Path | str | None = None,
+    *,
+    predictions: list[dict[str, Any]] | None = None,
+    split: str | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    if predictions is None:
+        records = _load_job_records(input_path)
+        predictions = extract_predictions(records, split=split or _split_for_path(input_path))
+
     by_position: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for record in records:
-        by_position[record["_position_id"]].append(record)
+    for prediction in predictions:
+        position_id = _prediction_position_id(prediction)
+        if position_id:
+            by_position[position_id].append(prediction)
 
     nodes: dict[str, dict[str, Any]] = {}
     edges: dict[str, dict[str, Any]] = {}
@@ -106,8 +153,12 @@ def build_graph_seed(input_path: Path | str | None = None) -> tuple[list[dict[st
             "relationship": "BELONGS_TO",
         }
 
-        for skill_id, aliases in SKILL_ALIASES.items():
-            hits = [record for record in position_records if _match_aliases(_record_text(record), aliases)]
+        skill_hits: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for prediction in position_records:
+            for skill_id in _prediction_skill_ids(prediction):
+                skill_hits[skill_id].append(prediction)
+
+        for skill_id, hits in sorted(skill_hits.items()):
             if not hits:
                 continue
             weight = round(len(hits) / max(1, len(position_records)), 2)
@@ -151,7 +202,7 @@ def build_graph_seed(input_path: Path | str | None = None) -> tuple[list[dict[st
                 "confidence": min(0.97, 0.6 + weight * 0.35),
             }
 
-    generated_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     for item in nodes.values():
         item["generatedAt"] = generated_at
     for item in edges.values():
@@ -231,11 +282,30 @@ def merge_graph_data(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build rule-based graph seed files from processed JD records.")
     parser.add_argument("--input", type=Path, default=None, help="JSONL JD records used to build graph seed files.")
+    parser.add_argument("--predictions-input", type=Path, default=None, help="Per-JD extraction predictions used to build the graph.")
+    parser.add_argument("--split", default="graph_train", help="Split to read from --predictions-input.")
+    parser.add_argument(
+        "--extraction-output",
+        type=Path,
+        default=None,
+        help="Optional path to write per-JD extraction predictions before graph aggregation.",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--replace", action="store_true", help="Replace the existing graph instead of merging into it.")
     args = parser.parse_args()
 
-    incoming_nodes, incoming_edges = build_graph_seed(args.input)
+    extraction_predictions: list[dict[str, Any]] | None = None
+    if args.predictions_input is not None:
+        extraction_predictions = [
+            item for item in read_jsonl(args.predictions_input)
+            if not args.split or item.get("split") == args.split
+        ]
+    elif args.extraction_output is not None:
+        records = _load_job_records(args.input)
+        extraction_predictions = extract_predictions(records, split=args.split or _split_for_path(args.input))
+        write_jsonl(args.extraction_output, extraction_predictions)
+
+    incoming_nodes, incoming_edges = build_graph_seed(args.input, predictions=extraction_predictions, split=args.split)
     node_path = args.output_dir / "graph_nodes.jsonl"
     edge_path = args.output_dir / "graph_edges.jsonl"
     if args.replace:
@@ -246,6 +316,10 @@ def main() -> None:
         operation = "merged"
     write_jsonl(node_path, nodes)
     write_jsonl(edge_path, edges)
+    if args.extraction_output is not None and extraction_predictions is not None:
+        print(f"wrote graph extraction predictions: {len(extraction_predictions)} records -> {args.extraction_output}")
+    elif args.predictions_input is not None:
+        print(f"read graph extraction predictions: {len(extraction_predictions or [])} records <- {args.predictions_input}")
     print(f"{operation} graph: {len(nodes)} nodes and {len(edges)} edges ({len(incoming_nodes)} incoming nodes)")
 
 

@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from src.llm_client import llm_config_status
+
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[3]
@@ -51,7 +53,12 @@ def data_source_status() -> dict[str, Any]:
         "splits/jd_test_set_100.jsonl",
         "splits/jd_holdout_336.jsonl",
         "splits/split_report.json",
+        "extractions/jd_extraction_predictions.jsonl",
+        "extractions/jd_graph_train_predictions.jsonl",
+        "extractions/llm_jd_extraction_predictions.jsonl",
+        "evaluation/jd_test_predictions.jsonl",
         "evaluation/jd_gold_labels.jsonl",
+        "evaluation/jd_llm_label_draft.jsonl",
         "evaluation/jd_evaluation_report.json",
     ]
     states = []
@@ -64,9 +71,11 @@ def data_source_status() -> dict[str, Any]:
                 "recordCount": len(read_jsonl(path)) if path.suffix == ".jsonl" and path.exists() else 0,
             }
         )
+    llm_status = llm_config_status(project_root())
     return {
         "llmRuntimeRequired": False,
-        "onlineLlmEnabled": False,
+        "onlineLlmEnabled": llm_status["configured"],
+        "llmConfig": llm_status,
         "readPriority": ["llm_enhanced_outputs", "rule_outputs", "realtime_relevant_jobs", "backend_demo_data"],
         "files": states,
     }
