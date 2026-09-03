@@ -149,6 +149,9 @@ class ResumeTaskStore:
         with self._lock:
             self._tasks[task_id] = task
 
+        if background and self._complete_text_task_with_rules(task, content):
+            return task
+
         if background:
             threading.Thread(
                 target=self._process,
@@ -159,6 +162,19 @@ class ResumeTaskStore:
         else:
             self._process(task, content, llm_client, raise_errors=True)
         return task
+
+    def _complete_text_task_with_rules(self, task: ResumeTask, content: bytes) -> bool:
+        try:
+            resume_content = extract_resume_content(task.filename, content, allow_vision=False)
+            task.progress = 45
+            task.updatedAt = _now()
+            task.result = parse_resume_text(task.filename, resume_content.text)
+            task.status = "completed"
+            task.progress = 100
+            task.updatedAt = _now()
+            return True
+        except Exception:
+            return False
 
     def _process(
         self,
