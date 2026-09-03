@@ -18,6 +18,7 @@ from backend.app.services.evolution_service import (
     _position_for_record,
     _record_text,
 )
+from src.llm_client import ChatCompletionsClient, load_llm_config
 from src.processing.clean_multisource_jobs import classify_records, read_jsonl as read_raw_jsonl
 
 
@@ -115,6 +116,112 @@ def _record_skills(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(skills, key=lambda item: (-item["frequency"], item["name"]))
 
 
+def _source_id(record: dict[str, Any]) -> str:
+    return str(record.get("source_id") or f"{record.get('source_platform', '')}:{record.get('source_job_id', '')}")
+
+
+def _append_predictions(path: Path, predictions: list[dict[str, Any]]) -> None:
+    existing = {str(item.get("sourceId") or item.get("evaluation_id") or ""): item for item in read_jsonl(path)}
+    for item in predictions:
+        source_id = str(item.get("sourceId") or item.get("evaluation_id") or "")
+        if source_id:
+            existing[source_id] = item
+    write_jsonl(path, list(existing.values()))
+
+
+def _extract_batch_with_llm(records: list[dict[str, Any]], batch_dir: Path) -> dict[str, dict[str, Any]]:
+    if not records:
+        return {}
+    if not load_llm_config().jd_enabled:
+        return {}
+
+    from src.processing.llm_extract_jd_skills import extract_jd_with_llm
+
+    checkpoint_path = batch_dir / "llm_jd_extraction_predictions.jsonl"
+    client = ChatCompletionsClient.from_env()
+
+    def checkpoint(batch_items: list[dict[str, Any]]) -> None:
+        _append_predictions(checkpoint_path, batch_items)
+
+    predictions = extract_jd_with_llm(
+        records,
+        client,
+        split="batch_upload",
+        batch_size=5,
+        on_batch=checkpoint,
+    )
+    write_jsonl(checkpoint_path, predictions)
+    _append_predictions(processed_path("extractions/llm_jd_extraction_predictions.jsonl"), predictions)
+    return {str(item.get("sourceId") or item.get("evaluation_id") or ""): item for item in predictions}
+
+
+def _prediction_position(
+    connection: sqlite3.Connection,
+    record: dict[str, Any],
+    prediction: dict[str, Any] | None,
+) -> tuple[str | None, str]:
+    if not prediction:
+        matched = _registry_match(connection, record["title"])
+        return matched if matched else (None, record["title"])
+
+    position = prediction.get("position") if isinstance(prediction.get("position"), dict) else {}
+    position_id = str(position.get("id") or prediction.get("positionId") or prediction.get("predictedPositionId") or "")
+    position_name = str(position.get("name") or prediction.get("positionName") or prediction.get("predictedPositionName") or record["title"])
+    if position_id and position_id not in {"candidate_other"} and not position_id.startswith("candidate_"):
+        row = connection.execute("SELECT id,name FROM position_registry WHERE id=? AND status='active'", (position_id,)).fetchone()
+        if row is not None:
+            return row["id"], row["name"]
+        if position_id in POSITION_NAME_MAP:
+            return position_id, POSITION_NAME_MAP[position_id]
+    return None, position_name or record["title"]
+
+
+def _skills_for_records(
+    records: list[dict[str, Any]],
+    predictions_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not predictions_by_id:
+        return _record_skills(records)
+
+    grouped: dict[str, dict[str, Any]] = {}
+    for record in records:
+        prediction = predictions_by_id.get(_source_id(record)) or {}
+        for skill in prediction.get("skills") or []:
+            if not isinstance(skill, dict):
+                continue
+            skill_id = str(skill.get("id") or "")
+            if skill_id not in SKILL_NAME_MAP:
+                continue
+            item = grouped.setdefault(
+                skill_id,
+                {
+                    "id": skill_id,
+                    "name": SKILL_NAME_MAP[skill_id],
+                    "frequency": 0,
+                    "_confidence_total": 0.0,
+                },
+            )
+            item["frequency"] += 1
+            item["_confidence_total"] += float(skill.get("confidence") or 0.7)
+
+    if not grouped:
+        return _record_skills(records)
+    result = []
+    for item in grouped.values():
+        frequency = int(item["frequency"])
+        result.append(
+            {
+                "id": item["id"],
+                "name": item["name"],
+                "frequency": frequency,
+                "weight": round(frequency / max(1, len(records)), 2),
+                "confidence": round(float(item["_confidence_total"]) / max(1, frequency), 3),
+                "source": "llm",
+            }
+        )
+    return sorted(result, key=lambda item: (-item["frequency"], item["name"]))
+
+
 def _update_unchanged_position_stats(updates: list[tuple[str, list[dict[str, Any]]]]) -> None:
     if not updates:
         return
@@ -154,6 +261,7 @@ def process_batch(filename: str, content: bytes) -> dict[str, Any]:
     raw_records, parse_rejections = read_raw_jsonl(raw_path)
     relevant, review_boundary, rejected, report = classify_records(raw_records)
     rejected_count = len(parse_rejections) + len(rejected) + len(review_boundary)
+    predictions_by_id = _extract_batch_with_llm(relevant, batch_dir)
     write_jsonl(batch_dir / "relevant_jobs.jsonl", relevant)
     write_jsonl(batch_dir / "rejected_jobs.jsonl", parse_rejections + rejected)
 
@@ -171,14 +279,15 @@ def process_batch(filename: str, content: bytes) -> dict[str, Any]:
         groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
         group_meta: dict[str, tuple[str | None, str]] = {}
         for record in unseen:
-            matched = _registry_match(connection, record["title"])
-            if matched:
-                key = f"existing:{matched[0]}"
-                group_meta[key] = (matched[0], matched[1])
+            prediction = predictions_by_id.get(_source_id(record))
+            position_id, position_name = _prediction_position(connection, record, prediction)
+            if position_id:
+                key = f"existing:{position_id}"
+                group_meta[key] = (position_id, position_name)
             else:
-                normalized = _normalize_position_title(record["title"])
+                normalized = _normalize_position_title(position_name)
                 key = f"candidate:{normalized}"
-                group_meta[key] = (None, record["title"])
+                group_meta[key] = (None, position_name)
             groups[key].append(record)
 
         graph_skills = _graph_position_skills()
@@ -188,7 +297,7 @@ def process_batch(filename: str, content: bytes) -> dict[str, Any]:
         unchanged_updates: list[tuple[str, list[dict[str, Any]]]] = []
         for key, records in groups.items():
             position_id, position_name = group_meta[key]
-            skills = _record_skills(records)
+            skills = _skills_for_records(records, predictions_by_id)
             companies = sorted({record.get("company", "未知公司") for record in records})
             evidence_ids = [record["source_id"] for record in records]
             if position_id is None:

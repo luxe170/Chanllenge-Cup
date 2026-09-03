@@ -139,11 +139,8 @@ def get_reviews(status: ReviewStatus | None = None, review_type: ReviewType | No
     pipeline_items = pipeline_reviews(status=status) if status else all_pipeline_items
     if all_pipeline_items:
         lowered = keyword.strip().lower()
-        generated_items = _build_emerging_reviews() + _build_change_reviews()
-        seen_ids = {item["id"] for item in pipeline_items}
-        combined_items = pipeline_items + [item for item in generated_items if item["id"] not in seen_ids]
         return fresh([
-            item for item in combined_items
+            item for item in pipeline_items
             if (not review_type or item["type"] == review_type)
             and (not lowered or lowered in f"{item['title']} {item['description']}".lower())
         ])
