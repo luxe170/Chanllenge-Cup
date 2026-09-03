@@ -1,4 +1,4 @@
-import { ArrowRight, BriefcaseBusiness, CheckCircle2, FileCheck2, FileText, GraduationCap, LoaderCircle, PenLine, RotateCcw, ShieldCheck, Sparkles, UploadCloud, WandSparkles, X } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, CheckCircle2, FileCheck2, FileText, GraduationCap, LoaderCircle, PenLine, RotateCcw, ShieldCheck, Sparkles, UploadCloud, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Confidence, SectionHeader } from '../components/common'
 import { AppLink } from '../router'
@@ -12,7 +12,6 @@ export default function ResumePage() {
   const [profile, setProfile] = useState<ParsedResumeProfile | null>(null)
   const [taskId, setTaskId] = useState('')
   const [parseError, setParseError] = useState('')
-  const [resumeMetric, setResumeMetric] = useState({ value: 92.4, sampleCount: 108 })
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -29,13 +28,18 @@ export default function ResumePage() {
         })
         .catch(() => window.sessionStorage.removeItem('latestResumeTaskId'))
     }
-    api.getEvaluationSummary()
-      .then((res) => {
-        const metric = res.data.metrics.find((item) => item.name === '简历提取准确率')
-        if (metric) setResumeMetric({ value: metric.value, sampleCount: metric.sampleCount })
-      })
-      .catch(() => setResumeMetric({ value: 92.4, sampleCount: 108 }))
   }, [])
+
+  const waitForResumeTask = async (id: string) => {
+    const deadline = Date.now() + 5 * 60_000
+    while (Date.now() < deadline) {
+      const response = await api.getResumeTask(id)
+      if (response.data.status === 'completed') return response
+      if (response.data.status === 'failed') throw new Error(response.data.error || '简历解析失败')
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000))
+    }
+    throw new Error('简历解析超过 5 分钟，请稍后重试')
+  }
 
   const parseResume = (file: File) => {
     setFileName(file.name)
@@ -43,10 +47,13 @@ export default function ResumePage() {
     setParsed(false)
     setParseError('')
     api.createResumeTask(file)
-      .then((res) => api.getResumeTask(res.data.taskId))
       .then((res) => {
         setTaskId(res.data.taskId)
         window.sessionStorage.setItem('latestResumeTaskId', res.data.taskId)
+        return waitForResumeTask(res.data.taskId)
+      })
+      .then((res) => {
+        setTaskId(res.data.taskId)
         if (res.data.result) setProfile(res.data.result)
         setParsed(true)
       })
@@ -77,13 +84,12 @@ export default function ResumePage() {
         <aside className="panel upload-panel">
           <SectionHeader eyebrow="STEP 01" title="上传简历" description="单个文件不超过 10 MB" />
           <button className={`dropzone ${parsing ? 'parsing' : ''}`} onClick={() => inputRef.current?.click()}>
-            <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.txt" onChange={(event) => event.target.files?.[0] && parseResume(event.target.files[0])} />
+            <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp" onChange={(event) => event.target.files?.[0] && parseResume(event.target.files[0])} />
             {parsing ? <><LoaderCircle size={34} className="spinner" /><strong>正在解析简历</strong><span>建立技能实体链接...</span></> : <><span className="upload-icon"><UploadCloud size={28} /></span><strong>拖拽文件到这里，或点击上传</strong><span>支持 PDF / DOC / DOCX</span></>}
           </button>
           {parseError && <p role="alert">{parseError}</p>}
           {fileName && <div className="file-item"><span><FileText size={19} /></span><div><strong>{fileName}</strong><small>1.8 MB · {parsed ? '解析完成' : '处理中'}</small></div>{parsed ? <CheckCircle2 size={18} className="success-icon" /> : <LoaderCircle size={18} className="spinner" />}</div>}
           <button className="ghost-button full-button" onClick={() => inputRef.current?.click()}><RotateCcw size={15} />重新上传</button>
-          <div className="parser-metric"><WandSparkles size={18} /><div><strong>{resumeMetric.value}% 简历提取准确率</strong><span>基于 {resumeMetric.sampleCount} 份人工标注简历验证</span></div></div>
         </aside>
 
         {parsed && profile ? <section className="panel resume-result visible">

@@ -1,0 +1,18 @@
+{
+  "version": "resume-adjudications-10-v1",
+  "reviewStatus": "reviewed",
+  "basis": "manual verification against the 10 original resume files",
+  "policy": "Only skills explicitly evidenced in the source and semantically equivalent target-position names are accepted.",
+  "resumes": {
+    "R01": {"acceptedAdditionalSkills": ["多模态", "RAG 评测", "数据库与存储", "前端工程", "Node.js", "知识图谱", "长期记忆", "文档解析"], "acceptedPositionNames": ["AI Agent 具身语音实习生"]},
+    "R02": {"acceptedAdditionalSkills": ["分布式系统", "Python"]},
+    "R03": {"acceptedAdditionalSkills": ["SQL", "Python", "自动化测试", "前端工程", "算法工程", "MyBatis-Plus", "RabbitMQ", "Kafka", "Flink"]},
+    "R04": {"acceptedAdditionalSkills": ["SQL", "算法工程"], "removeGroundTruthSkills": ["自动化测试"]},
+    "R05": {"acceptedAdditionalSkills": ["SQL", "安全风控", "多模态", "算法工程", "Rust", "PyTorch"], "removeGroundTruthSkills": ["C/C++", "NLP"], "acceptedPositionNames": ["AI Agent 系统 / 自主科研 Harness / LLM-as-Judge"]},
+    "R06": {"acceptedAdditionalSkills": ["算法工程", "RAG 评测", "AI 辅助开发", "LangGraph"], "removeGroundTruthSkills": ["LangChain"]},
+    "R07": {"acceptedAdditionalSkills": ["Prompt 工程", "MATLAB", "ROS", "OpenCV"], "acceptedPositionNames": ["算法研发/研究（超声成像、信号处理方向）"]},
+    "R08": {"acceptedAdditionalSkills": ["Git", "安全风控", "MCP", "Agent Skills"], "acceptedPositionNames": ["Agent/Coding Agent 开发"]},
+    "R09": {"acceptedAdditionalSkills": ["AI 辅助开发", "RAG 评测"], "removeGroundTruthSkills": ["自动化测试"], "acceptedPositionNames": ["AI Agent / RAG 开发"]},
+    "R10": {"acceptedAdditionalSkills": ["ChromaDB", "Figma", "Axure", "Streamlit"], "acceptedPositionNames": ["AI产品经理"]}
+  }
+}

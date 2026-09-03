@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import time
@@ -11,6 +12,7 @@ from typing import Any, Protocol
 
 
 DEFAULT_MODEL = "deepseek-v4-flash"
+DEFAULT_VISION_MODEL = "deepseek-v4-flash-vision-exp"
 DEFAULT_BASE_URL = "https://api.deepseek.com"
 DOTENV_FILENAMES = (".env", ".env.local")
 
@@ -21,11 +23,22 @@ class JsonChatClient(Protocol):
     def complete_json(self, system_prompt: str, user_payload: dict[str, Any]) -> dict[str, Any]:
         ...
 
+    def complete_json_with_images(
+        self,
+        system_prompt: str,
+        user_payload: dict[str, Any],
+        images: list[bytes],
+        *,
+        mime_type: str = "image/png",
+    ) -> dict[str, Any]:
+        ...
+
 
 @dataclass(slots=True)
 class LlmConfig:
     api_key: str
     model: str = DEFAULT_MODEL
+    vision_model: str = DEFAULT_VISION_MODEL
     base_url: str = DEFAULT_BASE_URL
     resume_enabled: bool = False
 
@@ -72,9 +85,11 @@ def load_llm_config(root: Path | None = None) -> LlmConfig:
         or _setting("DEEPSEEK_API_KEY", dotenv)
         or _setting("OPENAI_API_KEY", dotenv)
     )
+    model = _setting("LLM_MODEL", dotenv) or DEFAULT_MODEL
     return LlmConfig(
         api_key=api_key,
-        model=_setting("LLM_MODEL", dotenv) or DEFAULT_MODEL,
+        model=model,
+        vision_model=_setting("LLM_VISION_MODEL", dotenv) or DEFAULT_VISION_MODEL,
         base_url=_setting("LLM_BASE_URL", dotenv) or DEFAULT_BASE_URL,
         resume_enabled=_truthy(_setting("LLM_RESUME_ENABLED", dotenv) or _setting("RESUME_LLM_ENABLED", dotenv)),
     )
@@ -85,6 +100,7 @@ def llm_config_status(root: Path | None = None) -> dict[str, Any]:
     return {
         "configured": config.configured,
         "model": config.model,
+        "visionModel": config.vision_model,
         "baseUrl": config.base_url,
         "resumeEnabled": config.resume_enabled,
     }
@@ -94,6 +110,7 @@ def write_llm_config(
     api_key: str,
     *,
     model: str = DEFAULT_MODEL,
+    vision_model: str | None = None,
     base_url: str = DEFAULT_BASE_URL,
     resume_enabled: bool = True,
     root: Path | None = None,
@@ -102,6 +119,7 @@ def write_llm_config(
     if not cleaned_key:
         raise ValueError("LLM API key is required")
     cleaned_model = model.strip() or DEFAULT_MODEL
+    cleaned_vision_model = (vision_model or "").strip() or DEFAULT_VISION_MODEL
     cleaned_base_url = base_url.strip() or DEFAULT_BASE_URL
     root = root or project_root()
     env_path = root / ".env"
@@ -109,12 +127,14 @@ def write_llm_config(
         f"LLM_API_KEY={cleaned_key}",
         f"LLM_BASE_URL={cleaned_base_url}",
         f"LLM_MODEL={cleaned_model}",
+        f"LLM_VISION_MODEL={cleaned_vision_model}",
         f"LLM_RESUME_ENABLED={'true' if resume_enabled else 'false'}",
     ]
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return LlmConfig(
         api_key=cleaned_key,
         model=cleaned_model,
+        vision_model=cleaned_vision_model,
         base_url=cleaned_base_url,
         resume_enabled=resume_enabled,
     )
@@ -150,15 +170,52 @@ class ChatCompletionsClient:
         )
 
     def complete_json(self, system_prompt: str, user_payload: dict[str, Any]) -> dict[str, Any]:
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
-            ],
-            "temperature": self.temperature,
-            "response_format": {"type": "json_object"},
-        }
+        return self._complete_payload(
+            {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
+                ],
+                "temperature": self.temperature,
+                "response_format": {"type": "json_object"},
+            }
+        )
+
+    def complete_json_with_images(
+        self,
+        system_prompt: str,
+        user_payload: dict[str, Any],
+        images: list[bytes],
+        *,
+        mime_type: str = "image/png",
+    ) -> dict[str, Any]:
+        if not images:
+            raise ValueError("at least one image is required for multimodal completion")
+        user_content: list[dict[str, Any]] = [
+            {"type": "text", "text": json.dumps(user_payload, ensure_ascii=False)}
+        ]
+        for raw_image in images:
+            encoded = base64.b64encode(raw_image).decode("ascii")
+            user_content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{encoded}"},
+                }
+            )
+        return self._complete_payload(
+            {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                "temperature": self.temperature,
+                "response_format": {"type": "json_object"},
+            }
+        )
+
+    def _complete_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             f"{self.base_url.rstrip('/')}/chat/completions",

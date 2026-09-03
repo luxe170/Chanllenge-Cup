@@ -188,14 +188,6 @@
       "title": "推荐算法工程师-抖音电商"
     },
     {
-      "expectedPositionId": "candidate_other",
-      "extraSkills": [],
-      "missingSkills": [],
-      "predictedPositionId": "pos_algorithm_engineer",
-      "sourceId": "bytedance:7095579319473031460",
-      "title": "数据挖掘工程师-今日头条"
-    },
-    {
       "expectedPositionId": "pos_backend_engineer",
       "extraSkills": [
         "skill_algorithm",
@@ -208,16 +200,6 @@
       "predictedPositionId": "pos_algorithm_engineer",
       "sourceId": "bytedance:7273737124662577465",
       "title": "AML机器学习平台研发工程师"
-    },
-    {
-      "expectedPositionId": "pos_algorithm_engineer",
-      "extraSkills": [
-        "skill_multimodal"
-      ],
-      "missingSkills": [],
-      "predictedPositionId": "pos_algorithm_engineer",
-      "sourceId": "bytedance:7307185124781050163",
-      "title": "推荐算法工程师(商城)-抖音电商"
     },
     {
       "expectedPositionId": "pos_algorithm_engineer",
@@ -249,16 +231,6 @@
       "predictedPositionId": "pos_algorithm_engineer",
       "sourceId": "bytedance:7507108030464231688",
       "title": "多模态算法工程师-抖音内容理解"
-    },
-    {
-      "expectedPositionId": "pos_cloud_infra_engineer",
-      "extraSkills": [
-        "skill_algorithm"
-      ],
-      "missingSkills": [],
-      "predictedPositionId": "pos_algorithm_engineer",
-      "sourceId": "bytedance:7525452956260108552",
-      "title": "AML机器学习系统SRE工程师-火山引擎"
     },
     {
       "expectedPositionId": "pos_algorithm_engineer",
@@ -316,33 +288,71 @@
       "title": "微信输入法- 语音识别大模型算法研究员/工程师"
     },
     {
-      "expectedPositionId": "pos_backend_engineer",
-      "extraSkills": [],
+      "expectedPositionId": "pos_ai_agent_engineer",
+      "extraSkills": [
+        "skill_algorithm"
+      ],
       "missingSkills": [
-        "skill_distributed"
+        "skill_llm"
       ],
       "predictedPositionId": "pos_backend_engineer",
-      "sourceId": "bytedance:7473060281036998919",
-      "title": "网络研发工程师-监控告警方向"
+      "sourceId": "bytedance:7633454879164860677",
+      "title": "后端开发工程师/专家-Dev Infra"
+    },
+    {
+      "expectedPositionId": "pos_cloud_infra_engineer",
+      "extraSkills": [
+        "skill_database",
+        "skill_security"
+      ],
+      "missingSkills": [],
+      "predictedPositionId": "pos_cloud_infra_engineer",
+      "sourceId": "bytedance:7460745521352558856",
+      "title": "服务器交付专家-基础设施(杭州)"
+    },
+    {
+      "expectedPositionId": "pos_algorithm_engineer",
+      "extraSkills": [
+        "skill_database"
+      ],
+      "missingSkills": [],
+      "predictedPositionId": "pos_cloud_infra_engineer",
+      "sourceId": "bytedance:7491139823441545490",
+      "title": "研究科学家-基础设施系统实验室(北京/杭州)"
+    },
+    {
+      "expectedPositionId": "pos_cloud_infra_engineer",
+      "extraSkills": [
+        "skill_database"
+      ],
+      "missingSkills": [
+        "skill_distributed",
+        "skill_python"
+      ],
+      "predictedPositionId": "pos_cloud_infra_engineer",
+      "sourceId": "tencent_careers:1958073221844717568",
+      "title": "混元大模型Infra稳定性研发工程师(深圳/北京/上海/杭州)"
     }
   ],
-  "generatedAt": "2026-09-01T06:09:16Z",
+  "generatedAt": "2026-09-02T05:21:45Z",
   "invalidLabelCount": 0,
   "labelCount": 100,
-  "labelPath": "data\\processed\\evaluation\\jd_gold_labels.jsonl",
+  "labelPath": "data/processed/evaluation/jd_gold_labels.jsonl",
   "labeler": "deepseek-v4-flash",
   "metricSource": "deepseek_gold_evaluation",
   "missingLabelCount": 0,
-  "overallAccuracy": 0.7007,
-  "positionAccuracy": 0.62,
-  "positionCorrectCount": 62,
-  "predictionPath": "D:\\挑战杯func2\\挑战杯\\挑战杯\\data\\processed\\evaluation\\jd_test_predictions.jsonl",
+  "overallAccuracy": 0.6796,
+  "positionAccuracy": 0.58,
+  "positionCorrectCount": 58,
+  "predictionInputPath": "",
+  "predictionPath": "data/processed/evaluation/jd_test_predictions.jsonl",
+  "runLabel": "first-version-v2-no-overlap",
   "sampleCount": 100,
-  "skillF1": 0.7814,
-  "skillFalseNegative": 35,
-  "skillFalsePositive": 120,
-  "skillPrecision": 0.6977,
-  "skillRecall": 0.8878,
+  "skillF1": 0.7792,
+  "skillFalseNegative": 40,
+  "skillFalsePositive": 117,
+  "skillPrecision": 0.703,
+  "skillRecall": 0.8738,
   "skillTruePositive": 277,
-  "testSetPath": "data\\processed\\splits\\jd_test_set_100.jsonl"
+  "testSetPath": "data/processed/splits/jd_test_set_100.jsonl"
 }

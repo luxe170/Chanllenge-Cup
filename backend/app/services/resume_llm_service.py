@@ -30,7 +30,8 @@ def _skill_catalog() -> list[dict[str, Any]]:
 
 def _system_prompt() -> str:
     return (
-        "你是简历分析与学习建议助手。请只基于给定简历文本抽取事实，不要编造经历、学校、公司或技能。\n"
+        "你是简历分析与学习建议助手。输入可能是简历文本，也可能是按原始顺序排列的简历页面图片。"
+        "请只基于给定内容抽取事实，不要编造经历、学校、公司或技能。\n"
         "技能应尽量映射到 skills 中的标准技能 id；无法映射的技能可保留 name，但不要虚构 id。\n"
         "技能熟练度只能是 了解、熟悉、掌握、精通。熟练度必须基于上下文证据和个人贡献判断。\n"
         "学习建议必须对应简历中的能力缺口、项目证据缺口或目标岗位方向，不要输出泛泛资料清单。\n"
@@ -347,3 +348,24 @@ def analyze_resume_with_llm(
     result = client.complete_json(_system_prompt(), _user_payload(filename, text, fallback))
     return _normalize_profile(result, fallback, model=client.model, generated_at=timestamp)
 
+
+def analyze_resume_images_with_llm(
+    filename: str,
+    images: list[bytes],
+    client: JsonChatClient,
+    *,
+    mime_type: str = "image/png",
+    generated_at: str | None = None,
+) -> dict[str, Any]:
+    timestamp = generated_at or _generated_at()
+    complete_with_images = getattr(client, "complete_json_with_images", None)
+    if not callable(complete_with_images):
+        raise RuntimeError("当前 LLM 客户端不支持多模态图片输入")
+    payload = {
+        "filename": filename,
+        "inputMode": "vision",
+        "pageCount": len(images),
+        "instruction": "按图片顺序读取全部简历页面，并按要求输出结构化 profile。",
+    }
+    result = complete_with_images(_system_prompt(), payload, images, mime_type=mime_type)
+    return _normalize_profile(result, {}, model=client.model, generated_at=timestamp)

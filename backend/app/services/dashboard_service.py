@@ -33,7 +33,11 @@ def _raw_jobs_paths() -> list[Path]:
     raw_dir = _project_root() / "data" / "raw"
     if not raw_dir.exists():
         return []
-    return sorted(path for path in raw_dir.glob("*jobs.jsonl") if not path.name.startswith("demo_"))
+    return sorted(
+        path
+        for path in raw_dir.glob("*jobs.jsonl")
+        if not path.name.startswith(("demo_", "._"))
+    )
 
 
 def _count_jsonl_lines(path: Path) -> int:

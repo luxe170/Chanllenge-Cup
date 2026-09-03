@@ -7,7 +7,7 @@
 - `skill_registry_v1.jsonl`：技能主表。
 - `skill_aliases_v1.jsonl`：技能别名表。
 - `ontology_metadata_v1.json`：版本与数量信息。
-- `../jd_ground_truth_normalized_120_v1.jsonl`：引用岗位ID和技能ID的120条标准化标注。
+- `../jd_ground_truth_normalized_120_v1.jsonl`：第二版120条标准化标注，现仅作为历史材料保留；当前JD评测采用 `data/processed/splits/jd_test_set_100.jsonl` 与对应第一版标签。
 
 ## 岗位主表字段
 

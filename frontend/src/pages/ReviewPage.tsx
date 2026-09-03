@@ -1,4 +1,4 @@
-import { ArrowRight, Check, CheckCircle2, ChevronDown, CircleAlert, Clock3, Database, FileCheck2, Filter, FlaskConical, History, Search, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Check, CheckCircle2, ChevronDown, CircleAlert, Filter, Search, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Confidence, SectionHeader } from '../components/common'
 import { dashboardSummary, reviewItems as initialReviewItems } from '../data/mock'
@@ -21,10 +21,6 @@ export default function ReviewPage() {
   const [actionMessage, setActionMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const active = items.find((item) => item.id === activeId) ?? items[0]
-  const metricStatusText = (value: number, target: number) => (
-    value >= target ? `超过目标 ${target}%` : `距离目标 ${Math.max(0, target - value).toFixed(1)}%`
-  )
-
   useEffect(() => {
     api.getEvaluationSummary().then((res) => setEvaluation(res.data)).catch(() => setEvaluation(fallbackEvaluation))
   }, [])
@@ -68,12 +64,6 @@ export default function ReviewPage() {
     <div className="page-stack review-page">
       <section className="page-intro">
         <div><span className="section-eyebrow">QUALITY CONTROL</span><h2>让每个岗位与能力都有据可查</h2><p>对新岗位、能力变更与技能归一结果进行人工审核，并持续验证模型效果。</p></div>
-        <button className="ghost-button"><History size={16} />审核历史</button>
-      </section>
-
-      <section className="quality-metrics">
-        {evaluation.metrics.map((metric, index) => <article className="panel quality-metric" key={metric.name}><div className={`quality-icon quality-${index}`}>{index === 0 ? <Database size={19} /> : index === 1 ? <FileCheck2 size={19} /> : <FlaskConical size={19} />}</div><div><span>{metric.name}</span><strong>{metric.value}<small>%</small></strong><p>{metric.value >= metric.target ? <CheckCircle2 size={13} /> : <CircleAlert size={13} />}{metricStatusText(metric.value, metric.target)} · {metric.sampleCount} 条样本</p></div><div className="mini-ring" style={{ '--accuracy': `${metric.value * 3.6}deg` } as React.CSSProperties} /></article>)}
-        <article className="panel quality-metric pending-metric"><div className="quality-icon quality-3"><Clock3 size={19} /></div><div><span>待审核事项</span><strong>{evaluation.pendingReviewCount}<small>项</small></strong><p><CircleAlert size={13} />其中 {evaluation.highPriorityReviewCount} 项为高优先级</p></div><ArrowRight size={20} /></article>
       </section>
 
       <section className="panel review-workbench">
@@ -95,7 +85,7 @@ export default function ReviewPage() {
       </section>
 
       <section className="panel evaluation-table-panel">
-        <SectionHeader eyebrow="TEST REPORT" title="可量化评测报告" description="赛题核心指标与测试集覆盖情况" action={<button className="ghost-button"><FileCheck2 size={15} />导出完整报告</button>} />
+        <SectionHeader eyebrow="TEST REPORT" title="可量化评测报告" description="赛题核心指标与测试集覆盖情况" />
         <div className="evaluation-table"><div className="evaluation-head"><span>评测任务</span><span>测试集</span><span>准确率</span><span>赛题目标</span><span>结果</span></div>{evaluation.metrics.map((metric) => <div className="evaluation-row" key={metric.name}><span><ShieldCheck size={16} /><strong>{metric.name}</strong></span><span>{metric.sampleCount} 条标注样本</span><span><b>{metric.value}%</b><i><em style={{ width: `${metric.value}%` }} /></i></span><span>≥ {metric.target}%</span><span className={metric.value >= metric.target ? 'pass-chip' : 'warn-chip'}>{metric.value >= metric.target ? <CheckCircle2 size={14} /> : <CircleAlert size={14} />}{metric.value >= metric.target ? '通过' : '待优化'}</span></div>)}</div>
       </section>
     </div>

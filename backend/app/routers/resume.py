@@ -24,7 +24,7 @@ async def resume_tasks(file: UploadFile | None = File(default=None)) -> dict:
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="简历不能超过 10 MB")
     try:
-        return ok(create_resume_task(filename=file.filename or "resume", content=content))
+        return ok(create_resume_task(filename=file.filename or "resume", content=content, background=True))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

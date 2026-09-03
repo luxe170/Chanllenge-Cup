@@ -11,8 +11,12 @@ from typing import Any
 from backend.app.demo_data import PANORAMA_NODES, RESUME_TASK, SKILL_REVERSE_NODES, fresh
 from backend.app.services.data_sources import processed_path, read_jsonl
 from backend.app.services.evolution_service import SKILL_ALIASES, SKILL_NAME_MAP
-from backend.app.services.resume_llm_service import analyze_resume_with_llm, build_rule_learning_suggestions
-from backend.app.services.resume_text import ResumeTextError, extract_resume_text
+from backend.app.services.resume_llm_service import (
+    analyze_resume_images_with_llm,
+    analyze_resume_with_llm,
+    build_rule_learning_suggestions,
+)
+from backend.app.services.resume_text import ResumeTextError, extract_resume_content
 from src.llm_client import ChatCompletionsClient, JsonChatClient, load_llm_config
 
 
@@ -107,7 +111,14 @@ class ResumeTaskStore:
         self._tasks: dict[str, ResumeTask] = {}
         self._lock = threading.Lock()
 
-    def create(self, filename: str = "", content: bytes = b"", llm_client: JsonChatClient | None = None) -> ResumeTask:
+    def create(
+        self,
+        filename: str = "",
+        content: bytes = b"",
+        llm_client: JsonChatClient | None = None,
+        *,
+        background: bool = False,
+    ) -> ResumeTask:
         task_id = f"resume_{uuid.uuid4().hex[:10]}"
         now = _now()
         if not content:
@@ -138,13 +149,49 @@ class ResumeTaskStore:
         with self._lock:
             self._tasks[task_id] = task
 
-        text = extract_resume_text(task.filename, content)
-        task.progress = 65
-        task.result = analyze_resume_text(task.filename, text, llm_client=llm_client)
-        task.status = "completed"
-        task.progress = 100
-        task.updatedAt = _now()
+        if background:
+            threading.Thread(
+                target=self._process,
+                args=(task, content, llm_client),
+                daemon=True,
+                name=f"resume-parser-{task_id}",
+            ).start()
+        else:
+            self._process(task, content, llm_client, raise_errors=True)
         return task
+
+    def _process(
+        self,
+        task: ResumeTask,
+        content: bytes,
+        llm_client: JsonChatClient | None,
+        *,
+        raise_errors: bool = False,
+    ) -> None:
+        try:
+            use_multimodal = llm_client is not None or _resume_llm_enabled()
+            resume_content = extract_resume_content(task.filename, content, allow_vision=use_multimodal)
+            task.progress = 45
+            task.updatedAt = _now()
+            if resume_content.mode == "vision":
+                task.result = analyze_resume_images(
+                    task.filename,
+                    resume_content.images,
+                    mime_type=resume_content.mime_type,
+                    llm_client=llm_client,
+                )
+            else:
+                task.result = analyze_resume_text(task.filename, resume_content.text, llm_client=llm_client)
+            task.status = "completed"
+            task.progress = 100
+            task.updatedAt = _now()
+        except Exception as exc:
+            task.status = "failed"
+            task.progress = 100
+            task.error = str(exc)
+            task.updatedAt = _now()
+            if raise_errors:
+                raise
 
     def get(self, task_id: str) -> ResumeTask | None:
         with self._lock:
@@ -591,6 +638,7 @@ def analyze_resume_text(
             "enabled": True,
             "status": "completed",
             "model": client.model,
+            "inputMode": "text",
             "fallbackSource": "rule",
         }
         return profile
@@ -604,14 +652,43 @@ def analyze_resume_text(
         return rule_profile
 
 
+def analyze_resume_images(
+    filename: str,
+    images: list[bytes],
+    *,
+    mime_type: str = "image/png",
+    llm_client: JsonChatClient | None = None,
+) -> dict[str, Any]:
+    if llm_client is None and not _resume_llm_enabled():
+        raise ResumeTextError("扫描版 PDF 需要启用支持视觉输入的简历分析模型。")
+    try:
+        config = load_llm_config()
+        client = llm_client or ChatCompletionsClient.from_env(model=config.vision_model)
+        profile = analyze_resume_images_with_llm(filename, images, client, mime_type=mime_type)
+        profile["llmAnalysis"] = {
+            "enabled": True,
+            "status": "completed",
+            "model": client.model,
+            "inputMode": "vision",
+            "pageCount": len(images),
+            "fallbackSource": "none",
+        }
+        return profile
+    except Exception as exc:
+        raise ResumeTextError(
+            f"扫描版 PDF 多模态解析失败，请确认当前模型支持图片输入：{exc}"
+        ) from exc
+
+
 def create_resume_task(
     filename: str = "",
     content: bytes = b"",
     *,
     llm_client: JsonChatClient | None = None,
+    background: bool = False,
 ) -> dict:
     try:
-        task = _store.create(filename, content, llm_client=llm_client)
+        task = _store.create(filename, content, llm_client=llm_client, background=background)
     except ResumeTextError as exc:
         raise ValueError(str(exc)) from exc
     return {"taskId": task.taskId, "status": task.status, "progress": task.progress}
